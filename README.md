@@ -270,8 +270,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Issues**: [GitHub Issues](https://github.com/gokuthug1/-AimBot-ESP-latest-/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/gokuthug1/-AimBot-ESP-latest-/discussions)
-- **Discord**: [Community Server](https://discord.gg/example)
-
 ---
 
 **Remember: Use responsibly and respect others' gaming experience!**
