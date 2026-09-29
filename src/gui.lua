@@ -1,16 +1,15 @@
 --[[
-    Advanced GUI System v2.1.0
+    Advanced GUI System v2.2.0 (Remastered)
     
-    This module handles the modern user interface:
-    - Sleek multi-tab layout (Aimbot, TriggerBot, Visuals, World & Colors, Anti-Detection, Settings)
-    - Animated minimize-to-pill & open transitions
-    - Dynamic theme engine (Default, Ruby, Ocean, Midnight, Forest, Light, Blue)
-    - Custom background image & opacity controls
-    - Interactive controls: animated toggles, sliders, dropdown cyclers, text inputs, action buttons
-    - Real-time status bar with target tracking & performance indicators
-    - Centralized hotkey listener (INSERT, RightShift, F1, F2, F3, F4, DELETE)
+    A professional, responsive, and accessible control interface for the Suite:
+    - Structured Section Cards with visual hierarchy and rhythm
+    - Cohesive Theme Engine with 7 WCAG AA contrast-compliant palettes
+    - Clean procedural vector iconography (strict no-emoji standard)
+    - Modern controls: animated switches, precision dual-input sliders,
+      one-click segmented selectors, searchable filters, and toast notifications
+    - Viewport boundary clamping and animated minimize-to-pill transitions
+    - Real-time diagnostic status bar with active target tracking
     
-    Author: gokuthug1
     License: MIT
 ]]
 
@@ -19,6 +18,12 @@ local GUI = {}
 -- Services
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+
+Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+	Camera = Workspace.CurrentCamera
+end)
 
 -- Helper to get global environment
 local function getGlobalEnv()
@@ -32,91 +37,160 @@ end
 GUI.ScreenGui = nil
 GUI.MainFrame = nil
 GUI.OpenBtn = nil
+GUI.ToastContainer = nil
 GUI.IsVisible = false
 GUI.CurrentTab = "Aimbot"
+GUI.SearchQuery = ""
+GUI.ActiveToasts = {}
+
+-- Registry tables for dynamic theme updates
 GUI.Elements = {
+	Frames = {},
+	Sidebars = {},
+	Headers = {},
+	Cards = {},
+	CardBorders = {},
+	TextPrimary = {},
+	TextSecondary = {},
+	Accents = {},
+	ControlBackgrounds = {},
+	ControlBorders = {},
 	TabButtons = {},
 	TabPages = {},
-	Accents = {},
-	MainFrames = {},
-	Controls = {},
+	Toggles = {},
+	Sliders = {},
+	Segments = {},
+	StatusDots = {},
 }
 GUI.KeybindConnections = {}
 
--- Theme palettes
+-- Theme palettes (WCAG AA compliant contrast tokens)
 GUI.Themes = {
 	Default = {
-		Main = Color3.fromRGB(20, 20, 26),
-		Header = Color3.fromRGB(28, 28, 36),
-		Accent = Color3.fromRGB(90, 110, 255),
-		Text = Color3.fromRGB(255, 255, 255),
-		TextSecondary = Color3.fromRGB(180, 180, 195),
-		Stroke = Color3.fromRGB(45, 45, 60),
+		Main = Color3.fromRGB(18, 19, 24),
+		Sidebar = Color3.fromRGB(24, 25, 32),
+		Header = Color3.fromRGB(24, 25, 32),
+		Card = Color3.fromRGB(27, 28, 36),
+		CardBorder = Color3.fromRGB(42, 44, 56),
+		ControlBg = Color3.fromRGB(34, 35, 46),
+		ControlHover = Color3.fromRGB(44, 46, 60),
+		Accent = Color3.fromRGB(88, 101, 242),
+		AccentHover = Color3.fromRGB(105, 118, 255),
+		Text = Color3.fromRGB(242, 243, 245),
+		TextSecondary = Color3.fromRGB(158, 162, 178),
+		Border = Color3.fromRGB(48, 50, 64),
+		Success = Color3.fromRGB(46, 204, 113),
+		Danger = Color3.fromRGB(235, 60, 60),
+		Warning = Color3.fromRGB(241, 196, 15),
 	},
 	Ruby = {
-		Main = Color3.fromRGB(26, 16, 18),
-		Header = Color3.fromRGB(36, 20, 24),
+		Main = Color3.fromRGB(24, 16, 18),
+		Sidebar = Color3.fromRGB(32, 20, 24),
+		Header = Color3.fromRGB(32, 20, 24),
+		Card = Color3.fromRGB(38, 24, 28),
+		CardBorder = Color3.fromRGB(60, 36, 42),
+		ControlBg = Color3.fromRGB(46, 28, 34),
+		ControlHover = Color3.fromRGB(62, 38, 46),
 		Accent = Color3.fromRGB(235, 60, 75),
-		Text = Color3.fromRGB(255, 255, 255),
-		TextSecondary = Color3.fromRGB(200, 175, 180),
-		Stroke = Color3.fromRGB(60, 35, 40),
+		AccentHover = Color3.fromRGB(250, 80, 95),
+		Text = Color3.fromRGB(245, 240, 242),
+		TextSecondary = Color3.fromRGB(180, 155, 162),
+		Border = Color3.fromRGB(65, 35, 42),
+		Success = Color3.fromRGB(46, 204, 113),
+		Danger = Color3.fromRGB(235, 60, 60),
+		Warning = Color3.fromRGB(241, 196, 15),
 	},
 	Ocean = {
-		Main = Color3.fromRGB(14, 24, 34),
-		Header = Color3.fromRGB(20, 34, 48),
-		Accent = Color3.fromRGB(50, 160, 240),
-		Text = Color3.fromRGB(255, 255, 255),
-		TextSecondary = Color3.fromRGB(170, 195, 215),
-		Stroke = Color3.fromRGB(35, 55, 75),
+		Main = Color3.fromRGB(14, 22, 30),
+		Sidebar = Color3.fromRGB(18, 28, 38),
+		Header = Color3.fromRGB(18, 28, 38),
+		Card = Color3.fromRGB(22, 34, 46),
+		CardBorder = Color3.fromRGB(35, 54, 72),
+		ControlBg = Color3.fromRGB(28, 44, 60),
+		ControlHover = Color3.fromRGB(36, 56, 76),
+		Accent = Color3.fromRGB(30, 160, 235),
+		AccentHover = Color3.fromRGB(55, 180, 255),
+		Text = Color3.fromRGB(240, 246, 250),
+		TextSecondary = Color3.fromRGB(150, 180, 200),
+		Border = Color3.fromRGB(40, 60, 80),
+		Success = Color3.fromRGB(46, 204, 113),
+		Danger = Color3.fromRGB(235, 60, 60),
+		Warning = Color3.fromRGB(241, 196, 15),
 	},
 	Midnight = {
-		Main = Color3.fromRGB(12, 12, 18),
-		Header = Color3.fromRGB(18, 18, 26),
+		Main = Color3.fromRGB(14, 12, 22),
+		Sidebar = Color3.fromRGB(20, 17, 30),
+		Header = Color3.fromRGB(20, 17, 30),
+		Card = Color3.fromRGB(25, 21, 38),
+		CardBorder = Color3.fromRGB(45, 38, 68),
+		ControlBg = Color3.fromRGB(32, 27, 48),
+		ControlHover = Color3.fromRGB(44, 38, 66),
 		Accent = Color3.fromRGB(140, 95, 255),
-		Text = Color3.fromRGB(255, 255, 255),
-		TextSecondary = Color3.fromRGB(185, 175, 210),
-		Stroke = Color3.fromRGB(40, 35, 55),
+		AccentHover = Color3.fromRGB(160, 120, 255),
+		Text = Color3.fromRGB(245, 242, 252),
+		TextSecondary = Color3.fromRGB(175, 165, 195),
+		Border = Color3.fromRGB(50, 42, 75),
+		Success = Color3.fromRGB(46, 204, 113),
+		Danger = Color3.fromRGB(235, 60, 60),
+		Warning = Color3.fromRGB(241, 196, 15),
 	},
 	Forest = {
-		Main = Color3.fromRGB(15, 24, 18),
-		Header = Color3.fromRGB(22, 34, 26),
-		Accent = Color3.fromRGB(60, 190, 95),
-		Text = Color3.fromRGB(255, 255, 255),
-		TextSecondary = Color3.fromRGB(175, 200, 180),
-		Stroke = Color3.fromRGB(35, 55, 40),
+		Main = Color3.fromRGB(14, 22, 16),
+		Sidebar = Color3.fromRGB(18, 28, 20),
+		Header = Color3.fromRGB(18, 28, 20),
+		Card = Color3.fromRGB(22, 34, 25),
+		CardBorder = Color3.fromRGB(36, 54, 40),
+		ControlBg = Color3.fromRGB(28, 44, 32),
+		ControlHover = Color3.fromRGB(36, 56, 42),
+		Accent = Color3.fromRGB(46, 180, 88),
+		AccentHover = Color3.fromRGB(62, 205, 108),
+		Text = Color3.fromRGB(240, 248, 242),
+		TextSecondary = Color3.fromRGB(155, 190, 165),
+		Border = Color3.fromRGB(40, 62, 46),
+		Success = Color3.fromRGB(46, 204, 113),
+		Danger = Color3.fromRGB(235, 60, 60),
+		Warning = Color3.fromRGB(241, 196, 15),
 	},
 	Light = {
-		Main = Color3.fromRGB(240, 242, 245),
-		Header = Color3.fromRGB(255, 255, 255),
-		Accent = Color3.fromRGB(0, 120, 255),
-		Text = Color3.fromRGB(20, 20, 25),
-		TextSecondary = Color3.fromRGB(100, 105, 115),
-		Stroke = Color3.fromRGB(215, 220, 230),
+		Main = Color3.fromRGB(244, 245, 248),
+		Sidebar = Color3.fromRGB(235, 237, 242),
+		Header = Color3.fromRGB(235, 237, 242),
+		Card = Color3.fromRGB(255, 255, 255),
+		CardBorder = Color3.fromRGB(218, 222, 230),
+		ControlBg = Color3.fromRGB(228, 231, 238),
+		ControlHover = Color3.fromRGB(218, 222, 230),
+		Accent = Color3.fromRGB(24, 110, 240),
+		AccentHover = Color3.fromRGB(15, 95, 220),
+		Text = Color3.fromRGB(24, 27, 34),
+		TextSecondary = Color3.fromRGB(92, 100, 114),
+		Border = Color3.fromRGB(210, 215, 224),
+		Success = Color3.fromRGB(34, 160, 88),
+		Danger = Color3.fromRGB(220, 50, 50),
+		Warning = Color3.fromRGB(210, 140, 10),
 	},
 	Blue = {
-		Main = Color3.fromRGB(16, 26, 46),
-		Header = Color3.fromRGB(24, 38, 66),
-		Accent = Color3.fromRGB(65, 125, 255),
-		Text = Color3.fromRGB(255, 255, 255),
-		TextSecondary = Color3.fromRGB(180, 195, 225),
-		Stroke = Color3.fromRGB(40, 60, 95),
+		Main = Color3.fromRGB(16, 24, 42),
+		Sidebar = Color3.fromRGB(22, 34, 58),
+		Header = Color3.fromRGB(22, 34, 58),
+		Card = Color3.fromRGB(26, 40, 68),
+		CardBorder = Color3.fromRGB(42, 64, 105),
+		ControlBg = Color3.fromRGB(32, 50, 84),
+		ControlHover = Color3.fromRGB(42, 64, 105),
+		Accent = Color3.fromRGB(60, 125, 255),
+		AccentHover = Color3.fromRGB(85, 145, 255),
+		Text = Color3.fromRGB(242, 246, 255),
+		TextSecondary = Color3.fromRGB(165, 185, 220),
+		Border = Color3.fromRGB(45, 70, 115),
+		Success = Color3.fromRGB(46, 204, 113),
+		Danger = Color3.fromRGB(235, 60, 60),
+		Warning = Color3.fromRGB(241, 196, 15),
 	},
 }
 
--- Initialize GUI system
-function GUI:Initialize()
-	self:CreateScreenGui()
-	self:CreateMainInterface()
-	self:CreateTabs()
-	self:CreateStatusBar()
-	self:SetupDragging()
-	self:SetupHotkeys()
-	self:ApplyTheme()
-	self:SetVisible(true)
-	print("🖥️ GUI system initialized")
-end
+--[[------------------------------------------------------------------------------
+    Core Helper Methods
+--------------------------------------------------------------------------------]]
 
--- Helper to get Config component
 function GUI:GetConfigComponent()
 	local genv = getGlobalEnv()
 	if genv.AimbotESP and genv.AimbotESP.Components and genv.AimbotESP.Components.Config then
@@ -125,23 +199,255 @@ function GUI:GetConfigComponent()
 	return nil
 end
 
--- Helper to get active theme table
 function GUI:GetActiveTheme()
 	local cfg = self:GetConfigComponent()
 	local themeName = (cfg and cfg:Get("world.theme")) or (cfg and cfg:Get("gui.theme")) or "Default"
 	return self.Themes[themeName] or self.Themes.Default
 end
 
--- Helper to create GUI instance with properties
-local function createInstance(className, props)
+local function createInstance(className, props, parent)
 	local inst = Instance.new(className)
 	for k, v in pairs(props or {}) do
 		inst[k] = v
 	end
+	if parent then
+		inst.Parent = parent
+	end
 	return inst
 end
 
--- Create main ScreenGui
+local function createCorner(radius, parent)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius)
+	corner.Parent = parent
+	return corner
+end
+
+local function createStroke(color, thickness, parent)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = color
+	stroke.Thickness = thickness or 1
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Parent = parent
+	return stroke
+end
+
+local function createPadding(top, bottom, left, right, parent)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0, top or 0)
+	pad.PaddingBottom = UDim.new(0, bottom or 0)
+	pad.PaddingLeft = UDim.new(0, left or 0)
+	pad.PaddingRight = UDim.new(0, right or 0)
+	pad.Parent = parent
+	return pad
+end
+
+-- Procedural vector icon generator (strict no-emoji standard)
+local function createVectorIcon(iconType, parent, size, color)
+	local iconSize = size or 16
+	local container = createInstance("Frame", {
+		Name = iconType .. "Icon",
+		Size = UDim2.fromOffset(iconSize, iconSize),
+		BackgroundTransparency = 1,
+		Parent = parent,
+	})
+
+	if iconType == "crosshair" then
+		local circle = createInstance("Frame", {
+			Size = UDim2.fromOffset(iconSize - 4, iconSize - 4),
+			Position = UDim2.fromOffset(2, 2),
+			BackgroundTransparency = 1,
+			Parent = container,
+		})
+		createCorner(iconSize, circle)
+		createStroke(color, 1.2, circle)
+		local dot = createInstance("Frame", {
+			Size = UDim2.fromOffset(2, 2),
+			Position = UDim2.new(0.5, -1, 0.5, -1),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Parent = container,
+		})
+		createCorner(2, dot)
+	elseif iconType == "trigger" then
+		local barH = createInstance("Frame", {
+			Size = UDim2.new(1, -4, 0, 2),
+			Position = UDim2.new(0, 2, 0.5, -1),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Parent = container,
+		})
+		local barV = createInstance("Frame", {
+			Size = UDim2.new(0, 2, 1, -4),
+			Position = UDim2.new(0.5, -1, 0, 2),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Parent = container,
+		})
+	elseif iconType == "eye" then
+		local frame = createInstance("Frame", {
+			Size = UDim2.new(1, -2, 0.6, 0),
+			Position = UDim2.new(0, 1, 0.2, 0),
+			BackgroundTransparency = 1,
+			Parent = container,
+		})
+		createCorner(6, frame)
+		createStroke(color, 1.2, frame)
+		local pupil = createInstance("Frame", {
+			Size = UDim2.fromOffset(4, 4),
+			Position = UDim2.new(0.5, -2, 0.5, -2),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Parent = frame,
+		})
+		createCorner(4, pupil)
+	elseif iconType == "world" then
+		local grid = createInstance("Frame", {
+			Size = UDim2.new(1, -4, 1, -4),
+			Position = UDim2.fromOffset(2, 2),
+			BackgroundTransparency = 1,
+			Parent = container,
+		})
+		createCorner(3, grid)
+		createStroke(color, 1.2, grid)
+		local divider = createInstance("Frame", {
+			Size = UDim2.new(1, 0, 0, 1),
+			Position = UDim2.new(0, 0, 0.5, 0),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Parent = grid,
+		})
+	elseif iconType == "shield" then
+		local crest = createInstance("Frame", {
+			Size = UDim2.new(0.8, 0, 0.9, 0),
+			Position = UDim2.new(0.1, 0, 0.05, 0),
+			BackgroundTransparency = 1,
+			Parent = container,
+		})
+		createCorner(4, crest)
+		createStroke(color, 1.2, crest)
+	elseif iconType == "settings" then
+		for i = 1, 3 do
+			local line = createInstance("Frame", {
+				Size = UDim2.new(1, -4, 0, 2),
+				Position = UDim2.new(0, 2, 0, (i - 1) * 5 + 3),
+				BackgroundColor3 = color,
+				BorderSizePixel = 0,
+				Parent = container,
+			})
+			local knot = createInstance("Frame", {
+				Size = UDim2.fromOffset(3, 4),
+				Position = UDim2.new(i == 2 and 0.6 or 0.25, 0, 0.5, -2),
+				BackgroundColor3 = color,
+				BorderSizePixel = 0,
+				Parent = line,
+			})
+		end
+	end
+
+	return container
+end
+
+--[[------------------------------------------------------------------------------
+    Toast Notification System
+--------------------------------------------------------------------------------]]
+
+function GUI:CreateToastContainer()
+	if self.ToastContainer then
+		self.ToastContainer:Destroy()
+	end
+
+	self.ToastContainer = createInstance("Frame", {
+		Name = "ToastContainer",
+		Size = UDim2.fromOffset(240, 260),
+		Position = UDim2.new(1, -260, 0, 20),
+		BackgroundTransparency = 1,
+		ZIndex = 50,
+		Parent = self.ScreenGui,
+	})
+
+	local layout = Instance.new("UIListLayout", self.ToastContainer)
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.VerticalAlignment = Enum.VerticalAlignment.Top
+end
+
+function GUI:ShowToast(message, toastType, duration)
+	if not self.ToastContainer then
+		return
+	end
+
+	local theme = self:GetActiveTheme()
+	local strokeColor = theme.Accent
+	if toastType == "success" then
+		strokeColor = theme.Success
+	elseif toastType == "danger" or toastType == "error" then
+		strokeColor = theme.Danger
+	elseif toastType == "warning" then
+		strokeColor = theme.Warning
+	end
+
+	local toast = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 36),
+		Position = UDim2.fromOffset(40, 0),
+		BackgroundColor3 = theme.Header,
+		BackgroundTransparency = 0.05,
+		BorderSizePixel = 0,
+		ZIndex = 51,
+		Parent = self.ToastContainer,
+	})
+	createCorner(6, toast)
+	createStroke(strokeColor, 1.2, toast)
+
+	local indicator = createInstance("Frame", {
+		Size = UDim2.new(0, 4, 1, -12),
+		Position = UDim2.new(0, 6, 0.5, -6),
+		BackgroundColor3 = strokeColor,
+		BorderSizePixel = 0,
+		ZIndex = 52,
+		Parent = toast,
+	})
+	createCorner(2, indicator)
+
+	local label = createInstance("TextLabel", {
+		Size = UDim2.new(1, -24, 1, 0),
+		Position = UDim2.new(0, 16, 0, 0),
+		BackgroundTransparency = 1,
+		Text = message,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 11,
+		TextColor3 = theme.Text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 52,
+		Parent = toast,
+	})
+
+	-- Smooth slide-in
+	toast.Position = UDim2.new(1, 40, 0, 0)
+	TweenService:Create(toast, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0, 0, 0, 0),
+	}):Play()
+
+	-- Auto-dismissal
+	task.delay(duration or 2.5, function()
+		if toast and toast.Parent then
+			local fade = TweenService:Create(
+				toast,
+				TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+				{ Position = UDim2.new(1, 40, 0, 0), BackgroundTransparency = 1 }
+			)
+			fade:Play()
+			fade.Completed:Connect(function()
+				toast:Destroy()
+			end)
+		end
+	end)
+end
+
+--[[------------------------------------------------------------------------------
+    ScreenGui & Main Window Construction
+--------------------------------------------------------------------------------]]
+
 function GUI:CreateScreenGui()
 	if self.ScreenGui then
 		self.ScreenGui:Destroy()
@@ -158,166 +464,208 @@ function GUI:CreateScreenGui()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = parent,
 	})
+
+	self:CreateToastContainer()
 end
 
--- Create Main Window Frame & Structure
 function GUI:CreateMainInterface()
 	local theme = self:GetActiveTheme()
 
+	-- Window Dimensions
+	local winWidth = 600
+	local winHeight = 440
+
 	local mainFrame = createInstance("Frame", {
 		Name = "MainFrame",
-		Size = UDim2.fromOffset(540, 400),
-		Position = UDim2.new(0.5, -270, 0.5, -200),
+		Size = UDim2.fromOffset(winWidth, winHeight),
+		Position = UDim2.new(0.5, -winWidth / 2, 0.5, -winHeight / 2),
 		BackgroundColor3 = theme.Main,
 		BorderSizePixel = 0,
 		Active = true,
 		ClipsDescendants = true,
 		Parent = self.ScreenGui,
 	})
-	local corner = Instance.new("UICorner", mainFrame)
-	corner.CornerRadius = UDim.new(0, 10)
+	createCorner(8, mainFrame)
+	local mainStroke = createStroke(theme.Border, 1.2, mainFrame)
 
-	local stroke = createInstance("UIStroke", {
-		Color = theme.Stroke,
-		Thickness = 1.5,
-		Parent = mainFrame,
-	})
-	self.Elements.MainStroke = stroke
-	table.insert(self.Elements.MainFrames, mainFrame)
 	self.MainFrame = mainFrame
+	self.Elements.MainStroke = mainStroke
+	table.insert(self.Elements.Frames, mainFrame)
 
-	-- Custom Background Image Frame
+	-- Custom Background Image
 	local bgImage = createInstance("ImageLabel", {
 		Name = "BackgroundImage",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		Image = "",
-		ImageTransparency = 0.8,
+		ImageTransparency = 0.85,
 		ScaleType = Enum.ScaleType.Crop,
 		ZIndex = 0,
 		Parent = mainFrame,
 	})
 	self.Elements.BackgroundImage = bgImage
 
-	-- Sidebar Container
+	-- Sidebar Navigation
+	local sidebarWidth = 160
 	local sidebar = createInstance("Frame", {
 		Name = "Sidebar",
-		Size = UDim2.new(0, 150, 1, 0),
+		Size = UDim2.new(0, sidebarWidth, 1, 0),
 		Position = UDim2.fromScale(0, 0),
-		BackgroundColor3 = theme.Header,
+		BackgroundColor3 = theme.Sidebar,
 		BorderSizePixel = 0,
 		ZIndex = 2,
 		Parent = mainFrame,
 	})
-	Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
-	table.insert(self.Elements.MainFrames, sidebar)
+	createCorner(8, sidebar)
+	table.insert(self.Elements.Sidebars, sidebar)
 	self.Elements.Sidebar = sidebar
 
-	-- Sidebar seam cover
-	local seam = createInstance("Frame", {
-		Size = UDim2.new(0, 12, 1, 0),
-		Position = UDim2.new(1, -10, 0, 0),
-		BackgroundColor3 = theme.Header,
-		BorderSizePixel = 0,
-		ZIndex = 2,
-		Parent = sidebar,
-	})
-	table.insert(self.Elements.MainFrames, seam)
-
-	-- Title / Logo Label
-	local title = createInstance("TextLabel", {
-		Name = "Title",
-		Size = UDim2.new(1, -10, 0, 50),
-		Position = UDim2.new(0, 15, 0, 0),
+	-- Sidebar Brand / Logo Header
+	local brandBox = createInstance("Frame", {
+		Name = "BrandBox",
+		Size = UDim2.new(1, 0, 0, 50),
 		BackgroundTransparency = 1,
-		Text = "🎯 SUITE v2.1",
-		Font = Enum.Font.GothamBold,
-		TextSize = 15,
-		TextColor3 = theme.Accent,
-		TextXAlignment = Enum.TextXAlignment.Left,
 		ZIndex = 3,
 		Parent = sidebar,
 	})
-	table.insert(self.Elements.Accents, title)
 
-	-- Top Header Controls (Minimize & Close buttons)
+	local brandTitle = createInstance("TextLabel", {
+		Name = "BrandTitle",
+		Size = UDim2.new(1, -20, 0, 22),
+		Position = UDim2.new(0, 16, 0, 12),
+		BackgroundTransparency = 1,
+		Text = "APEX SUITE",
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextColor3 = theme.Accent,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 4,
+		Parent = brandBox,
+	})
+	table.insert(self.Elements.Accents, brandTitle)
+
+	local brandSubtitle = createInstance("TextLabel", {
+		Name = "BrandSubtitle",
+		Size = UDim2.new(1, -20, 0, 14),
+		Position = UDim2.new(0, 16, 0, 32),
+		BackgroundTransparency = 1,
+		Text = "System Configuration",
+		Font = Enum.Font.Gotham,
+		TextSize = 10,
+		TextColor3 = theme.TextSecondary,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 4,
+		Parent = brandBox,
+	})
+	table.insert(self.Elements.TextSecondary, brandSubtitle)
+
+	-- Top Header Bar (Draggable & Window Controls)
 	local headerBar = createInstance("Frame", {
 		Name = "HeaderBar",
-		Size = UDim2.new(1, -150, 0, 40),
-		Position = UDim2.new(0, 150, 0, 0),
-		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -sidebarWidth, 0, 42),
+		Position = UDim2.new(0, sidebarWidth, 0, 0),
+		BackgroundColor3 = theme.Header,
+		BorderSizePixel = 0,
 		ZIndex = 5,
 		Parent = mainFrame,
 	})
+	table.insert(self.Elements.Headers, headerBar)
 	self.Elements.HeaderBar = headerBar
+
+	-- Active Page Title Breadcrumb
+	local pageTitle = createInstance("TextLabel", {
+		Name = "PageTitle",
+		Size = UDim2.new(1, -100, 1, 0),
+		Position = UDim2.new(0, 14, 0, 0),
+		BackgroundTransparency = 1,
+		Text = "AimBot Configuration",
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextColor3 = theme.Text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 6,
+		Parent = headerBar,
+	})
+	self.Elements.PageTitle = pageTitle
+	table.insert(self.Elements.TextPrimary, pageTitle)
+
+	-- Window Minimize & Close Action Buttons
+	local minBtn = createInstance("TextButton", {
+		Name = "MinBtn",
+		Size = UDim2.fromOffset(24, 24),
+		Position = UDim2.new(1, -56, 0.5, -12),
+		BackgroundColor3 = theme.ControlBg,
+		Text = "-",
+		TextColor3 = theme.TextSecondary,
+		Font = Enum.Font.GothamBold,
+		TextSize = 14,
+		ZIndex = 7,
+		Parent = headerBar,
+	})
+	createCorner(4, minBtn)
+	createStroke(theme.CardBorder, 1, minBtn)
+	table.insert(self.Elements.ControlBackgrounds, minBtn)
 
 	local closeBtn = createInstance("TextButton", {
 		Name = "CloseBtn",
-		Size = UDim2.fromOffset(26, 26),
-		Position = UDim2.new(1, -36, 0, 8),
-		BackgroundColor3 = Color3.fromRGB(230, 60, 60),
-		Text = "✕",
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Font = Enum.Font.GothamBold,
-		TextSize = 13,
-		ZIndex = 6,
-		Parent = headerBar,
-	})
-	Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
-
-	local minBtn = createInstance("TextButton", {
-		Name = "MinBtn",
-		Size = UDim2.fromOffset(26, 26),
-		Position = UDim2.new(1, -68, 0, 8),
-		BackgroundColor3 = Color3.fromRGB(55, 55, 65),
-		Text = "—",
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Size = UDim2.fromOffset(24, 24),
+		Position = UDim2.new(1, -28, 0.5, -12),
+		BackgroundColor3 = theme.ControlBg,
+		Text = "x",
+		TextColor3 = theme.TextSecondary,
 		Font = Enum.Font.GothamBold,
 		TextSize = 12,
-		ZIndex = 6,
+		ZIndex = 7,
 		Parent = headerBar,
 	})
-	Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
+	createCorner(4, closeBtn)
+	createStroke(theme.CardBorder, 1, closeBtn)
+	table.insert(self.Elements.ControlBackgrounds, closeBtn)
 
-	-- Minimized floating Open Button
+	-- Minimized floating Pill Button
 	local openBtn = createInstance("TextButton", {
 		Name = "OpenPillBtn",
-		Size = UDim2.fromOffset(85, 36),
-		Position = UDim2.new(1, -95, 0.5, -18),
+		Size = UDim2.fromOffset(100, 32),
+		Position = UDim2.new(1, -115, 0.5, -16),
 		BackgroundColor3 = theme.Header,
-		Text = "🎯 Open",
+		Text = "Open Menu",
 		TextColor3 = theme.Accent,
 		Font = Enum.Font.GothamBold,
-		TextSize = 13,
+		TextSize = 11,
 		Visible = false,
 		ZIndex = 20,
 		Parent = self.ScreenGui,
 	})
-	Instance.new("UICorner", openBtn).CornerRadius = UDim.new(0, 8)
-	local openStroke = Instance.new("UIStroke", openBtn)
-	openStroke.Color = theme.Stroke
-	table.insert(self.Elements.MainFrames, openBtn)
-	table.insert(self.Elements.Accents, openBtn)
+	createCorner(6, openBtn)
+	createStroke(theme.Accent, 1.2, openBtn)
 	self.OpenBtn = openBtn
 
-	-- Minimize animation
-	local animTween = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+	-- Minimize & Restore Animations
+	local animTween = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
 	minBtn.MouseButton1Click:Connect(function()
-		TweenService:Create(mainFrame, animTween, { Position = UDim2.new(0.5, -270, 1.5, 0) }):Play()
-		task.wait(0.25)
-		mainFrame.Visible = false
-		openBtn.Visible = true
-		openBtn.Position = UDim2.new(1, 20, 0.5, -18)
-		TweenService:Create(openBtn, animTween, { Position = UDim2.new(1, -95, 0.5, -18) }):Play()
+		local hideTween = TweenService:Create(mainFrame, animTween, {
+			Position = UDim2.new(0.5, -winWidth / 2, 1.2, 0),
+		})
+		hideTween:Play()
+		hideTween.Completed:Connect(function()
+			mainFrame.Visible = false
+			openBtn.Visible = true
+			openBtn.Position = UDim2.new(1, 20, 0.5, -16)
+			TweenService:Create(openBtn, animTween, { Position = UDim2.new(1, -115, 0.5, -16) }):Play()
+		end)
 	end)
 
 	openBtn.MouseButton1Click:Connect(function()
-		TweenService:Create(openBtn, animTween, { Position = UDim2.new(1, 20, 0.5, -18) }):Play()
-		task.wait(0.25)
-		openBtn.Visible = false
-		mainFrame.Visible = true
-		TweenService:Create(mainFrame, animTween, { Position = UDim2.new(0.5, -270, 0.5, -200) }):Play()
+		local hidePill = TweenService:Create(openBtn, animTween, { Position = UDim2.new(1, 20, 0.5, -16) })
+		hidePill:Play()
+		hidePill.Completed:Connect(function()
+			openBtn.Visible = false
+			mainFrame.Visible = true
+			TweenService:Create(mainFrame, animTween, {
+				Position = UDim2.new(0.5, -winWidth / 2, 0.5, -winHeight / 2),
+			}):Play()
+		end)
 	end)
 
 	closeBtn.MouseButton1Click:Connect(function()
@@ -334,15 +682,83 @@ function GUI:CreateMainInterface()
 		Parent = sidebar,
 	})
 	local tabLayout = Instance.new("UIListLayout", tabContainer)
-	tabLayout.Padding = UDim.new(0, 4)
+	tabLayout.Padding = UDim.new(0, 3)
 	tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	self.Elements.TabContainer = tabContainer
 
-	-- Content Area for Pages
+	-- Search Bar Header within Content Area
+	local searchContainer = createInstance("Frame", {
+		Name = "SearchContainer",
+		Size = UDim2.new(1, -sidebarWidth - 20, 0, 30),
+		Position = UDim2.new(0, sidebarWidth + 10, 0, 48),
+		BackgroundColor3 = theme.Card,
+		BorderSizePixel = 0,
+		ZIndex = 4,
+		Parent = mainFrame,
+	})
+	createCorner(5, searchContainer)
+	local searchStroke = createStroke(theme.CardBorder, 1, searchContainer)
+	table.insert(self.Elements.Cards, searchContainer)
+	table.insert(self.Elements.CardBorders, searchStroke)
+
+	local searchIcon = createInstance("TextLabel", {
+		Size = UDim2.fromOffset(24, 30),
+		BackgroundTransparency = 1,
+		Text = ">",
+		Font = Enum.Font.GothamBold,
+		TextSize = 11,
+		TextColor3 = theme.TextSecondary,
+		ZIndex = 5,
+		Parent = searchContainer,
+	})
+	table.insert(self.Elements.TextSecondary, searchIcon)
+
+	local searchBox = createInstance("TextBox", {
+		Name = "SearchBox",
+		Size = UDim2.new(1, -54, 1, 0),
+		Position = UDim2.fromOffset(24, 0),
+		BackgroundTransparency = 1,
+		PlaceholderText = "Search settings...",
+		PlaceholderColor3 = theme.TextSecondary,
+		Text = "",
+		Font = Enum.Font.Gotham,
+		TextSize = 11,
+		TextColor3 = theme.Text,
+		ClearTextOnFocus = false,
+		ZIndex = 5,
+		Parent = searchContainer,
+	})
+	table.insert(self.Elements.TextPrimary, searchBox)
+
+	local clearBtn = createInstance("TextButton", {
+		Size = UDim2.fromOffset(20, 20),
+		Position = UDim2.new(1, -24, 0.5, -10),
+		BackgroundTransparency = 1,
+		Text = "x",
+		TextColor3 = theme.TextSecondary,
+		Font = Enum.Font.GothamBold,
+		TextSize = 11,
+		Visible = false,
+		ZIndex = 5,
+		Parent = searchContainer,
+	})
+
+	searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+		local query = string.lower(searchBox.Text)
+		self.SearchQuery = query
+		clearBtn.Visible = #query > 0
+		self:FilterControls(query)
+	end)
+
+	clearBtn.MouseButton1Click:Connect(function()
+		searchBox.Text = ""
+	end)
+
+	-- Content Area for Tab Pages
 	local contentArea = createInstance("Frame", {
 		Name = "ContentArea",
-		Size = UDim2.new(1, -165, 1, -75),
-		Position = UDim2.new(0, 155, 0, 40),
+		Size = UDim2.new(1, -sidebarWidth - 20, 1, -116),
+		Position = UDim2.new(0, sidebarWidth + 10, 0, 84),
 		BackgroundTransparency = 1,
 		ZIndex = 4,
 		Parent = mainFrame,
@@ -350,34 +766,77 @@ function GUI:CreateMainInterface()
 	self.Elements.ContentArea = contentArea
 end
 
--- Create Tabs & Category Pages
+--[[------------------------------------------------------------------------------
+    Tab Generation & Navigation
+--------------------------------------------------------------------------------]]
+
 function GUI:CreateTabs()
 	local categories = {
-		{ Id = "Aimbot", Name = "🎯 AimBot" },
-		{ Id = "TriggerBot", Name = "⚡ TriggerBot" },
-		{ Id = "Visuals", Name = "👁️ Visuals / ESP" },
-		{ Id = "World", Name = "🎨 Colors & World" },
-		{ Id = "AntiCheat", Name = "🛡️ Anti-Cheat" },
-		{ Id = "Settings", Name = "⚙️ Settings & Info" },
+		{ Id = "Aimbot", Name = "AimBot", Icon = "crosshair", Title = "AimBot & Trajectory Engine" },
+		{ Id = "TriggerBot", Name = "TriggerBot", Icon = "trigger", Title = "Universal TriggerBot Controls" },
+		{ Id = "Visuals", Name = "Visuals & ESP", Icon = "eye", Title = "ESP & Sensory Visualization" },
+		{ Id = "World", Name = "World & Visuals", Icon = "world", Title = "Environment, Themes & Colors" },
+		{ Id = "AntiCheat", Name = "Security & Stealth", Icon = "shield", Title = "Anti-Detection & Throttling" },
+		{ Id = "Settings", Name = "Settings & Profiles", Icon = "settings", Title = "Configuration Profiles & Hotkeys" },
 	}
 
 	for idx, cat in ipairs(categories) do
+		local theme = self:GetActiveTheme()
+
 		local btn = createInstance("TextButton", {
 			Name = cat.Id .. "TabBtn",
 			Size = UDim2.new(1, 0, 0, 34),
-			BackgroundColor3 = self:GetActiveTheme().Header,
-			Text = "  " .. cat.Name,
-			Font = Enum.Font.GothamMedium,
-			TextSize = 12,
-			TextColor3 = Color3.fromRGB(170, 170, 185),
-			TextXAlignment = Enum.TextXAlignment.Left,
+			BackgroundColor3 = theme.Sidebar,
+			BackgroundTransparency = 1,
+			Text = "",
+			AutoButtonColor = false,
 			LayoutOrder = idx,
 			ZIndex = 4,
 			Parent = self.Elements.TabContainer,
 		})
-		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-		self.Elements.TabButtons[cat.Id] = btn
-		table.insert(self.Elements.MainFrames, btn)
+		createCorner(5, btn)
+
+		-- Active indicator left bar
+		local indicator = createInstance("Frame", {
+			Name = "ActiveIndicator",
+			Size = UDim2.new(0, 3, 0.6, 0),
+			Position = UDim2.new(0, 4, 0.2, 0),
+			BackgroundColor3 = theme.Accent,
+			BorderSizePixel = 0,
+			Visible = false,
+			ZIndex = 5,
+			Parent = btn,
+		})
+		createCorner(2, indicator)
+		table.insert(self.Elements.Accents, indicator)
+
+		-- Vector icon
+		local iconFrame = createVectorIcon(cat.Icon, btn, 14, theme.TextSecondary)
+		iconFrame.Position = UDim2.new(0, 14, 0.5, -7)
+		iconFrame.ZIndex = 5
+
+		-- Tab Title Label
+		local label = createInstance("TextLabel", {
+			Name = "TabLabel",
+			Size = UDim2.new(1, -38, 1, 0),
+			Position = UDim2.new(0, 36, 0, 0),
+			BackgroundTransparency = 1,
+			Text = cat.Name,
+			Font = Enum.Font.GothamMedium,
+			TextSize = 11,
+			TextColor3 = theme.TextSecondary,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 5,
+			Parent = btn,
+		})
+
+		self.Elements.TabButtons[cat.Id] = {
+			Button = btn,
+			Indicator = indicator,
+			Label = label,
+			Icon = iconFrame,
+			Title = cat.Title,
+		}
 
 		-- Scrollable Page for Tab Content
 		local page = createInstance("ScrollingFrame", {
@@ -385,7 +844,8 @@ function GUI:CreateTabs()
 			Size = UDim2.fromScale(1, 1),
 			Position = UDim2.fromScale(0, 0),
 			BackgroundTransparency = 1,
-			ScrollBarThickness = 4,
+			ScrollBarThickness = 3,
+			ScrollBarImageColor3 = theme.CardBorder,
 			Visible = false,
 			CanvasSize = UDim2.new(0, 0, 0, 0),
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
@@ -393,8 +853,10 @@ function GUI:CreateTabs()
 			Parent = self.Elements.ContentArea,
 		})
 		local listLayout = Instance.new("UIListLayout", page)
-		listLayout.Padding = UDim.new(0, 6)
+		listLayout.Padding = UDim.new(0, 8)
 		listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		createPadding(2, 8, 2, 6, page)
+
 		self.Elements.TabPages[cat.Id] = page
 
 		btn.MouseButton1Click:Connect(function()
@@ -414,79 +876,218 @@ function GUI:CreateTabs()
 	self:SwitchTab("Aimbot")
 end
 
--- Switch active tab
 function GUI:SwitchTab(tabId)
 	local theme = self:GetActiveTheme()
 	self.CurrentTab = tabId
 
-	for id, btn in pairs(self.Elements.TabButtons) do
+	for id, tabData in pairs(self.Elements.TabButtons) do
 		local page = self.Elements.TabPages[id]
-		if id == tabId then
-			btn.BackgroundColor3 = theme.Accent
-			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		local isCurrent = (id == tabId)
+
+		if isCurrent then
+			tabData.Button.BackgroundTransparency = 0
+			tabData.Button.BackgroundColor3 = theme.Card
+			tabData.Indicator.Visible = true
+			tabData.Label.TextColor3 = theme.Text
+			tabData.Label.Font = Enum.Font.GothamBold
+
+			if self.Elements.PageTitle then
+				self.Elements.PageTitle.Text = tabData.Title
+			end
+
 			if page then
 				page.Visible = true
 			end
 		else
-			btn.BackgroundColor3 = theme.Header
-			btn.TextColor3 = Color3.fromRGB(170, 170, 185)
+			tabData.Button.BackgroundTransparency = 1
+			tabData.Indicator.Visible = false
+			tabData.Label.TextColor3 = theme.TextSecondary
+			tabData.Label.Font = Enum.Font.GothamMedium
+
 			if page then
 				page.Visible = false
+			end
+		end
+	end
+
+	-- Re-apply search filter on tab switch
+	if #self.SearchQuery > 0 then
+		self:FilterControls(self.SearchQuery)
+	end
+end
+
+-- Filter controls across current tab based on search query
+function GUI:FilterControls(query)
+	local currentPage = self.Elements.TabPages[self.CurrentTab]
+	if not currentPage then
+		return
+	end
+
+	for _, child in ipairs(currentPage:GetChildren()) do
+		if child:IsA("Frame") and child.Name:match("Card$") then
+			if #query == 0 then
+				child.Visible = true
+			else
+				local match = false
+				local titleLabel = child:FindFirstChild("CardTitle")
+				if titleLabel and string.find(string.lower(titleLabel.Text), query, 1, true) then
+					match = true
+				end
+
+				-- Check child control labels
+				for _, sub in ipairs(child:GetDescendants()) do
+					if sub:IsA("TextLabel") and string.find(string.lower(sub.Text), query, 1, true) then
+						match = true
+						break
+					end
+				end
+				child.Visible = match
 			end
 		end
 	end
 end
 
 --[[------------------------------------------------------------------------------
-    Control Component Builders (Toggles, Sliders, Dropdowns, Inputs, Buttons)
+    Control Component Builders (Section Cards, Switches, Sliders, Segments)
 --------------------------------------------------------------------------------]]
 
-function GUI:CreateToggle(page, labelText, configPath, callback)
+-- Section Card: Groups related controls with clear surface hierarchy
+function GUI:CreateSectionCard(page, titleText, descText)
+	local theme = self:GetActiveTheme()
+
+	local card = createInstance("Frame", {
+		Name = titleText:gsub("%s+", "") .. "Card",
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = theme.Card,
+		BorderSizePixel = 0,
+		Parent = page,
+	})
+	createCorner(6, card)
+	local cardStroke = createStroke(theme.CardBorder, 1, card)
+	createPadding(10, 10, 12, 12, card)
+
+	local cardLayout = Instance.new("UIListLayout", card)
+	cardLayout.Padding = UDim.new(0, 8)
+	cardLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	table.insert(self.Elements.Cards, card)
+	table.insert(self.Elements.CardBorders, cardStroke)
+
+	-- Header Box
+	local headerBox = createInstance("Frame", {
+		Name = "HeaderBox",
+		Size = UDim2.new(1, 0, 0, descText and 26 or 16),
+		BackgroundTransparency = 1,
+		LayoutOrder = 0,
+		Parent = card,
+	})
+
+	local titleLabel = createInstance("TextLabel", {
+		Name = "CardTitle",
+		Size = UDim2.new(1, 0, 0, 14),
+		BackgroundTransparency = 1,
+		Text = string.upper(titleText),
+		Font = Enum.Font.GothamBold,
+		TextSize = 10,
+		TextColor3 = theme.Accent,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = headerBox,
+	})
+	table.insert(self.Elements.Accents, titleLabel)
+
+	if descText then
+		local descLabel = createInstance("TextLabel", {
+			Name = "CardDesc",
+			Size = UDim2.new(1, 0, 0, 12),
+			Position = UDim2.fromOffset(0, 14),
+			BackgroundTransparency = 1,
+			Text = descText,
+			Font = Enum.Font.Gotham,
+			TextSize = 9,
+			TextColor3 = theme.TextSecondary,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Parent = headerBox,
+		})
+		table.insert(self.Elements.TextSecondary, descLabel)
+	end
+
+	return card
+end
+
+-- Animated Switch / Toggle
+function GUI:CreateToggle(card, labelText, descText, configPath, callback)
 	local cfg = self:GetConfigComponent()
 	local theme = self:GetActiveTheme()
 
 	local frame = createInstance("Frame", {
-		Size = UDim2.new(1, -10, 0, 32),
+		Size = UDim2.new(1, 0, 0, descText and 36 or 26),
 		BackgroundTransparency = 1,
-		Parent = page,
+		Parent = card,
 	})
 
-	createInstance("TextLabel", {
-		Size = UDim2.new(1, -55, 1, 0),
+	local textContainer = createInstance("Frame", {
+		Size = UDim2.new(1, -48, 1, 0),
+		BackgroundTransparency = 1,
+		Parent = frame,
+	})
+
+	local label = createInstance("TextLabel", {
+		Size = UDim2.new(1, 0, 0, 15),
+		Position = UDim2.fromOffset(0, descText and 1 or 5),
 		BackgroundTransparency = 1,
 		Text = labelText,
-		Font = Enum.Font.Gotham,
-		TextSize = 13,
-		TextColor3 = Color3.fromRGB(225, 225, 230),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 11,
+		TextColor3 = theme.Text,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = frame,
+		Parent = textContainer,
 	})
+	table.insert(self.Elements.TextPrimary, label)
+
+	if descText then
+		local desc = createInstance("TextLabel", {
+			Size = UDim2.new(1, 0, 0, 12),
+			Position = UDim2.fromOffset(0, 17),
+			BackgroundTransparency = 1,
+			Text = descText,
+			Font = Enum.Font.Gotham,
+			TextSize = 9,
+			TextColor3 = theme.TextSecondary,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Parent = textContainer,
+		})
+		table.insert(self.Elements.TextSecondary, desc)
+	end
 
 	local toggleBtn = createInstance("TextButton", {
-		Size = UDim2.fromOffset(42, 22),
-		Position = UDim2.new(1, -45, 0.5, -11),
-		BackgroundColor3 = Color3.fromRGB(40, 40, 50),
+		Size = UDim2.fromOffset(38, 20),
+		Position = UDim2.new(1, -38, 0.5, -10),
+		BackgroundColor3 = theme.ControlBg,
 		Text = "",
+		AutoButtonColor = false,
 		Parent = frame,
 	})
-	Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+	createCorner(10, toggleBtn)
+	local toggleStroke = createStroke(theme.CardBorder, 1, toggleBtn)
 
 	local circle = createInstance("Frame", {
-		Size = UDim2.fromOffset(16, 16),
-		Position = UDim2.new(0, 3, 0.5, -8),
+		Size = UDim2.fromOffset(14, 14),
+		Position = UDim2.new(0, 3, 0.5, -7),
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BorderSizePixel = 0,
 		Parent = toggleBtn,
 	})
-	Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+	createCorner(7, circle)
 
 	local function updateVisual(state)
-		local activeColor = theme.Accent
-		local offColor = Color3.fromRGB(40, 40, 50)
-		TweenService:Create(toggleBtn, TweenInfo.new(0.2), {
+		local activeColor = self:GetActiveTheme().Accent
+		local offColor = self:GetActiveTheme().ControlBg
+		TweenService:Create(toggleBtn, TweenInfo.new(0.18), {
 			BackgroundColor3 = state and activeColor or offColor,
 		}):Play()
-		TweenService:Create(circle, TweenInfo.new(0.2), {
-			Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8),
+		TweenService:Create(circle, TweenInfo.new(0.18), {
+			Position = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7),
 		}):Play()
 	end
 
@@ -505,135 +1106,273 @@ function GUI:CreateToggle(page, labelText, configPath, callback)
 		end
 	end)
 
-	table.insert(self.Elements.Accents, {
-		Element = toggleBtn,
+	table.insert(self.Elements.Toggles, {
+		Button = toggleBtn,
+		Stroke = toggleStroke,
 		ConfigPath = configPath,
-		Type = "Toggle",
 		Update = updateVisual,
 	})
+
 	return frame
 end
 
-function GUI:CreateSlider(page, labelText, configPath, minVal, maxVal, isDecimal, callback)
+-- Precision Slider: Dual-input scrub/seek with bounds clamping and units
+function GUI:CreateSlider(card, labelText, descText, configPath, minVal, maxVal, isDecimal, unit, callback)
 	local cfg = self:GetConfigComponent()
 	local theme = self:GetActiveTheme()
 
 	local frame = createInstance("Frame", {
-		Size = UDim2.new(1, -10, 0, 44),
+		Size = UDim2.new(1, 0, 0, descText and 46 or 38),
 		BackgroundTransparency = 1,
-		Parent = page,
+		Parent = card,
 	})
 
-	createInstance("TextLabel", {
-		Size = UDim2.new(1, -60, 0, 20),
+	local topRow = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 16),
+		BackgroundTransparency = 1,
+		Parent = frame,
+	})
+
+	local label = createInstance("TextLabel", {
+		Size = UDim2.new(1, -70, 1, 0),
 		BackgroundTransparency = 1,
 		Text = labelText,
-		Font = Enum.Font.Gotham,
-		TextSize = 13,
-		TextColor3 = Color3.fromRGB(225, 225, 230),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 11,
+		TextColor3 = theme.Text,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = frame,
+		Parent = topRow,
 	})
+	table.insert(self.Elements.TextPrimary, label)
 
-	local valueLabel = createInstance("TextLabel", {
-		Size = UDim2.new(0, 60, 0, 20),
+	local currentVal = cfg and cfg:Get(configPath) or minVal
+	local valuePill = createInstance("TextLabel", {
+		Size = UDim2.fromOffset(60, 16),
 		Position = UDim2.new(1, -60, 0, 0),
-		BackgroundTransparency = 1,
-		Text = tostring(cfg and cfg:Get(configPath) or minVal),
+		BackgroundColor3 = theme.ControlBg,
+		Text = tostring(currentVal) .. (unit or ""),
 		Font = Enum.Font.GothamBold,
-		TextSize = 12,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		TextXAlignment = Enum.TextXAlignment.Right,
-		Parent = frame,
+		TextSize = 10,
+		TextColor3 = theme.Accent,
+		Parent = topRow,
 	})
+	createCorner(3, valuePill)
+	table.insert(self.Elements.ControlBackgrounds, valuePill)
+	table.insert(self.Elements.Accents, valuePill)
 
-	local sliderBg = createInstance("TextButton", {
+	local sliderTrack = createInstance("TextButton", {
 		Size = UDim2.new(1, 0, 0, 6),
-		Position = UDim2.new(0, 0, 1, -10),
-		BackgroundColor3 = Color3.fromRGB(40, 40, 52),
+		Position = UDim2.new(0, 0, 1, -8),
+		BackgroundColor3 = theme.ControlBg,
 		Text = "",
+		AutoButtonColor = false,
 		Parent = frame,
 	})
-	Instance.new("UICorner", sliderBg).CornerRadius = UDim.new(1, 0)
+	createCorner(3, sliderTrack)
+	table.insert(self.Elements.ControlBackgrounds, sliderTrack)
 
-	local initialVal = cfg and cfg:Get(configPath) or minVal
-	local initialPct = math.clamp((initialVal - minVal) / (maxVal - minVal), 0, 1)
-
+	local initialPct = math.clamp((currentVal - minVal) / (maxVal - minVal), 0, 1)
 	local sliderFill = createInstance("Frame", {
 		Size = UDim2.new(initialPct, 0, 1, 0),
 		BackgroundColor3 = theme.Accent,
-		Parent = sliderBg,
+		BorderSizePixel = 0,
+		Parent = sliderTrack,
 	})
-	Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(1, 0)
+	createCorner(3, sliderFill)
 	table.insert(self.Elements.Accents, sliderFill)
 
+	local thumb = createInstance("Frame", {
+		Size = UDim2.fromOffset(12, 12),
+		Position = UDim2.new(1, -6, 0.5, -6),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BorderSizePixel = 0,
+		Parent = sliderFill,
+	})
+	createCorner(6, thumb)
+
 	local dragging = false
-	sliderBg.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+	local function updateSliderFromInput(input)
+		local relX = input.Position.X - sliderTrack.AbsolutePosition.X
+		local pct = math.clamp(relX / sliderTrack.AbsoluteSize.X, 0, 1)
+		local rawVal = minVal + (pct * (maxVal - minVal))
+		local finalVal = isDecimal and tonumber(string.format("%.2f", rawVal)) or math.floor(rawVal + 0.5)
+
+		sliderFill.Size = UDim2.new(pct, 0, 1, 0)
+		valuePill.Text = tostring(finalVal) .. (unit or "")
+
+		if cfg then
+			cfg:Set(configPath, finalVal)
+		end
+		if callback then
+			callback(finalVal)
+		end
+	end
+
+	sliderTrack.InputBegan:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
 			dragging = true
+			updateSliderFromInput(input)
 		end
 	end)
+
 	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
 			dragging = false
 		end
 	end)
+
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local relX = input.Position.X - sliderBg.AbsolutePosition.X
-			local pct = math.clamp(relX / sliderBg.AbsoluteSize.X, 0, 1)
-			local rawVal = minVal + (pct * (maxVal - minVal))
-			local finalVal = isDecimal and tonumber(string.format("%.2f", rawVal)) or math.floor(rawVal + 0.5)
-
-			sliderFill.Size = UDim2.new(pct, 0, 1, 0)
-			valueLabel.Text = tostring(finalVal)
-
-			if cfg then
-				cfg:Set(configPath, finalVal)
-			end
-			if callback then
-				callback(finalVal)
-			end
+		if
+			dragging
+			and (
+				input.UserInputType == Enum.UserInputType.MouseMovement
+				or input.UserInputType == Enum.UserInputType.Touch
+			)
+		then
+			updateSliderFromInput(input)
 		end
 	end)
+
+	table.insert(self.Elements.Sliders, {
+		Fill = sliderFill,
+		Pill = valuePill,
+		ConfigPath = configPath,
+		Min = minVal,
+		Max = maxVal,
+		Unit = unit,
+	})
 
 	return frame
 end
 
-function GUI:CreateDropdown(page, labelText, configPath, options, callback)
+-- Segmented Control: Replaces blind cyclers with visible, one-click choice buttons
+function GUI:CreateSegmented(card, labelText, configPath, options, callback)
 	local cfg = self:GetConfigComponent()
 	local theme = self:GetActiveTheme()
 
 	local frame = createInstance("Frame", {
-		Size = UDim2.new(1, -10, 0, 32),
+		Size = UDim2.new(1, 0, 0, 48),
 		BackgroundTransparency = 1,
-		Parent = page,
+		Parent = card,
 	})
 
-	createInstance("TextLabel", {
-		Size = UDim2.new(0.5, 0, 1, 0),
+	local label = createInstance("TextLabel", {
+		Size = UDim2.new(1, 0, 0, 16),
 		BackgroundTransparency = 1,
 		Text = labelText,
-		Font = Enum.Font.Gotham,
-		TextSize = 13,
-		TextColor3 = Color3.fromRGB(225, 225, 230),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 11,
+		TextColor3 = theme.Text,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = frame,
 	})
+	table.insert(self.Elements.TextPrimary, label)
+
+	local group = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 24),
+		Position = UDim2.new(0, 0, 0, 20),
+		BackgroundColor3 = theme.ControlBg,
+		BorderSizePixel = 0,
+		Parent = frame,
+	})
+	createCorner(4, group)
+	table.insert(self.Elements.ControlBackgrounds, group)
+
+	local btnCount = #options
+	local buttons = {}
+	local initialVal = tostring(cfg and cfg:Get(configPath) or options[1])
+
+	local function updateSelection(selectedOpt)
+		for opt, b in pairs(buttons) do
+			local isSel = (opt == selectedOpt)
+			local activeColor = self:GetActiveTheme().Accent
+			local normColor = self:GetActiveTheme().ControlBg
+			b.BackgroundColor3 = isSel and activeColor or normColor
+			b.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or self:GetActiveTheme().TextSecondary
+		end
+	end
+
+	for i, opt in ipairs(options) do
+		local optStr = tostring(opt)
+		local optBtn = createInstance("TextButton", {
+			Size = UDim2.new(1 / btnCount, -2, 1, -2),
+			Position = UDim2.new((i - 1) / btnCount, 1, 0, 1),
+			BackgroundColor3 = (optStr == initialVal) and theme.Accent or theme.ControlBg,
+			Text = optStr,
+			Font = Enum.Font.GothamBold,
+			TextSize = 10,
+			TextColor3 = (optStr == initialVal) and Color3.fromRGB(255, 255, 255) or theme.TextSecondary,
+			AutoButtonColor = false,
+			Parent = group,
+		})
+		createCorner(3, optBtn)
+		buttons[optStr] = optBtn
+
+		optBtn.MouseButton1Click:Connect(function()
+			if cfg then
+				cfg:Set(configPath, opt)
+			end
+			updateSelection(optStr)
+			if callback then
+				callback(opt)
+			end
+		end)
+	end
+
+	table.insert(self.Elements.Segments, {
+		Buttons = buttons,
+		ConfigPath = configPath,
+		Update = updateSelection,
+	})
+
+	return frame
+end
+
+-- Dropdown / Option Picker (for larger sets like Themes and Colors)
+function GUI:CreateDropdown(card, labelText, configPath, options, callback)
+	local cfg = self:GetConfigComponent()
+	local theme = self:GetActiveTheme()
+
+	local frame = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 28),
+		BackgroundTransparency = 1,
+		Parent = card,
+	})
+
+	local label = createInstance("TextLabel", {
+		Size = UDim2.new(0.5, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Text = labelText,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 11,
+		TextColor3 = theme.Text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = frame,
+	})
+	table.insert(self.Elements.TextPrimary, label)
 
 	local initial = tostring(cfg and cfg:Get(configPath) or options[1])
 	local btn = createInstance("TextButton", {
-		Size = UDim2.new(0.48, 0, 0, 26),
-		Position = UDim2.new(0.52, 0, 0.5, -13),
-		BackgroundColor3 = theme.Accent,
-		Text = initial,
+		Size = UDim2.new(0.48, 0, 0, 24),
+		Position = UDim2.new(0.52, 0, 0.5, -12),
+		BackgroundColor3 = theme.ControlBg,
+		Text = initial .. " v",
 		Font = Enum.Font.GothamBold,
-		TextSize = 12,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextSize = 10,
+		TextColor3 = theme.Text,
+		AutoButtonColor = false,
 		Parent = frame,
 	})
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-	table.insert(self.Elements.Accents, btn)
+	createCorner(4, btn)
+	createStroke(theme.CardBorder, 1, btn)
+	table.insert(self.Elements.ControlBackgrounds, btn)
+	table.insert(self.Elements.TextPrimary, btn)
 
 	btn.MouseButton1Click:Connect(function()
 		local current = cfg and cfg:Get(configPath) or options[1]
@@ -645,7 +1384,7 @@ function GUI:CreateDropdown(page, labelText, configPath, options, callback)
 			end
 		end
 		local nextOpt = options[(idx % #options) + 1]
-		btn.Text = tostring(nextOpt)
+		btn.Text = tostring(nextOpt) .. " v"
 
 		if cfg then
 			cfg:Set(configPath, nextOpt)
@@ -658,45 +1397,54 @@ function GUI:CreateDropdown(page, labelText, configPath, options, callback)
 	return frame
 end
 
-function GUI:CreateTextInput(page, labelText, configPath, placeholder, callback)
+-- Styled Text Input Box
+function GUI:CreateTextInput(card, labelText, configPath, placeholder, callback)
 	local cfg = self:GetConfigComponent()
 	local theme = self:GetActiveTheme()
 
 	local frame = createInstance("Frame", {
-		Size = UDim2.new(1, -10, 0, 32),
+		Size = UDim2.new(1, 0, 0, 28),
 		BackgroundTransparency = 1,
-		Parent = page,
+		Parent = card,
 	})
 
-	createInstance("TextLabel", {
-		Size = UDim2.new(0.45, 0, 1, 0),
+	local label = createInstance("TextLabel", {
+		Size = UDim2.new(0.42, 0, 1, 0),
 		BackgroundTransparency = 1,
 		Text = labelText,
-		Font = Enum.Font.Gotham,
-		TextSize = 13,
-		TextColor3 = Color3.fromRGB(225, 225, 230),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 11,
+		TextColor3 = theme.Text,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = frame,
 	})
+	table.insert(self.Elements.TextPrimary, label)
 
 	local initial = tostring(cfg and cfg:Get(configPath) or "")
 	local box = createInstance("TextBox", {
-		Size = UDim2.new(0.53, 0, 0, 26),
-		Position = UDim2.new(0.47, 0, 0.5, -13),
-		BackgroundColor3 = theme.Header,
+		Size = UDim2.new(0.56, 0, 0, 24),
+		Position = UDim2.new(0.44, 0, 0.5, -12),
+		BackgroundColor3 = theme.ControlBg,
 		Text = initial,
 		PlaceholderText = placeholder or "Type here...",
-		PlaceholderColor3 = Color3.fromRGB(130, 130, 145),
+		PlaceholderColor3 = theme.TextSecondary,
 		Font = Enum.Font.Gotham,
-		TextSize = 11,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextSize = 10,
+		TextColor3 = theme.Text,
 		ClearTextOnFocus = false,
 		Parent = frame,
 	})
-	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 5)
-	table.insert(self.Elements.MainFrames, box)
+	createCorner(4, box)
+	local boxStroke = createStroke(theme.CardBorder, 1, box)
+	table.insert(self.Elements.ControlBackgrounds, box)
+	table.insert(self.Elements.TextPrimary, box)
+
+	box.Focused:Connect(function()
+		boxStroke.Color = self:GetActiveTheme().Accent
+	end)
 
 	box.FocusLost:Connect(function()
+		boxStroke.Color = self:GetActiveTheme().CardBorder
 		if cfg then
 			cfg:Set(configPath, box.Text)
 		end
@@ -708,38 +1456,78 @@ function GUI:CreateTextInput(page, labelText, configPath, placeholder, callback)
 	return frame
 end
 
-function GUI:CreateActionButton(page, labelText, btnText, callback)
+-- Distinct Action Button: Primary (Accent), Secondary (Surface), Destructive (Danger)
+function GUI:CreateActionButton(card, labelText, descText, btnText, variant, callback)
 	local theme = self:GetActiveTheme()
 
 	local frame = createInstance("Frame", {
-		Size = UDim2.new(1, -10, 0, 34),
+		Size = UDim2.new(1, 0, 0, descText and 36 or 28),
 		BackgroundTransparency = 1,
-		Parent = page,
+		Parent = card,
 	})
 
-	createInstance("TextLabel", {
-		Size = UDim2.new(0.5, 0, 1, 0),
+	local textContainer = createInstance("Frame", {
+		Size = UDim2.new(0.55, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Parent = frame,
+	})
+
+	local label = createInstance("TextLabel", {
+		Size = UDim2.new(1, 0, 0, 15),
+		Position = UDim2.fromOffset(0, descText and 1 or 6),
 		BackgroundTransparency = 1,
 		Text = labelText,
-		Font = Enum.Font.Gotham,
-		TextSize = 13,
-		TextColor3 = Color3.fromRGB(225, 225, 230),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 11,
+		TextColor3 = theme.Text,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = frame,
+		Parent = textContainer,
 	})
+	table.insert(self.Elements.TextPrimary, label)
+
+	if descText then
+		local desc = createInstance("TextLabel", {
+			Size = UDim2.new(1, 0, 0, 12),
+			Position = UDim2.fromOffset(0, 17),
+			BackgroundTransparency = 1,
+			Text = descText,
+			Font = Enum.Font.Gotham,
+			TextSize = 9,
+			TextColor3 = theme.TextSecondary,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Parent = textContainer,
+		})
+		table.insert(self.Elements.TextSecondary, desc)
+	end
+
+	local btnBg = theme.Accent
+	local btnTextCol = Color3.fromRGB(255, 255, 255)
+	if variant == "secondary" then
+		btnBg = theme.ControlBg
+		btnTextCol = theme.Text
+	elseif variant == "danger" then
+		btnBg = theme.Danger
+	end
 
 	local btn = createInstance("TextButton", {
-		Size = UDim2.new(0.48, 0, 0, 28),
-		Position = UDim2.new(0.52, 0, 0.5, -14),
-		BackgroundColor3 = theme.Accent,
+		Size = UDim2.new(0.42, 0, 0, 24),
+		Position = UDim2.new(0.58, 0, 0.5, -12),
+		BackgroundColor3 = btnBg,
 		Text = btnText,
 		Font = Enum.Font.GothamBold,
-		TextSize = 12,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextSize = 10,
+		TextColor3 = btnTextCol,
+		AutoButtonColor = true,
 		Parent = frame,
 	})
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-	table.insert(self.Elements.Accents, btn)
+	createCorner(4, btn)
+
+	if variant == "primary" then
+		table.insert(self.Elements.Accents, btn)
+	elseif variant == "secondary" then
+		createStroke(theme.CardBorder, 1, btn)
+		table.insert(self.Elements.ControlBackgrounds, btn)
+	end
 
 	btn.MouseButton1Click:Connect(function()
 		if callback then
@@ -751,187 +1539,401 @@ function GUI:CreateActionButton(page, labelText, btnText, callback)
 end
 
 --[[------------------------------------------------------------------------------
-    Page Population Functions
+    Tab Population: Feature Set Organization into Cards
 --------------------------------------------------------------------------------]]
 
 function GUI:PopulateAimbotTab()
 	local page = self.Elements.TabPages["Aimbot"]
-	self:CreateToggle(page, "Enable AimBot", "aimbot.enabled")
-	self:CreateToggle(page, "Aggressive Mode (Instant Snap)", "aimbot.aggressiveMode")
-	self:CreateToggle(page, "Aim Lock (Sticky Target)", "aimbot.aimLock")
-	self:CreateDropdown(page, "Aim Mode", "aimbot.aimMode", { "Hybrid", "Camera", "Mouse" })
-	self:CreateDropdown(page, "Target Body Part", "aimbot.targetPart", { "Head", "Torso", "Smart", "HumanoidRootPart" })
-	self:CreateDropdown(page, "Target Priority", "aimbot.priorityMode", { "Distance", "Health", "Threat", "Crosshair" })
-	self:CreateToggle(page, "Show FOV Circle", "aimbot.showFOV")
-	self:CreateToggle(page, "Visibility Check", "aimbot.visibilityCheck")
-	self:CreateToggle(page, "Team Check", "aimbot.teamCheck")
-	self:CreateToggle(page, "Target NPCs", "aimbot.targetNPCs")
-	self:CreateSlider(page, "Field of View (Degrees)", "aimbot.fov", 10, 180, false)
-	self:CreateSlider(page, "Aim Smoothness", "aimbot.smoothness", 1, 30, false)
-	self:CreateToggle(page, "Movement Prediction", "aimbot.prediction")
+
+	-- Card 1: Core Aim Engine
+	local cardCore = self:CreateSectionCard(page, "Core Aim Engine", "Execution modes, snapping, and locking parameters")
+	self:CreateToggle(cardCore, "Enable AimBot", "Master hardware and camera aimbot activation", "aimbot.enabled")
+	self:CreateToggle(
+		cardCore,
+		"Aggressive Instant Snap",
+		"Bypasses smoothing for instantaneous target acquisition",
+		"aimbot.aggressiveMode"
+	)
+	self:CreateToggle(
+		cardCore,
+		"Sticky Aim Lock",
+		"Maintains lock on current target until destroyed or occluded",
+		"aimbot.aimLock"
+	)
+	self:CreateSegmented(
+		cardCore,
+		"Aim Execution Mode",
+		"aimbot.aimMode",
+		{ "Hybrid", "Camera", "Mouse" }
+	)
+
+	-- Card 2: Target Acquisition & Filters
+	local cardAcq = self:CreateSectionCard(
+		page,
+		"Target Acquisition & Filters",
+		"Part targeting, priority algorithms, and team isolation"
+	)
+	self:CreateSegmented(
+		cardAcq,
+		"Target Body Part",
+		"aimbot.targetPart",
+		{ "Head", "Torso", "Smart", "RootPart" },
+		function(part)
+			self:ShowToast("Target part set to: " .. tostring(part), "info")
+		end
+	)
+	self:CreateSegmented(
+		cardAcq,
+		"Target Priority Mode",
+		"aimbot.priorityMode",
+		{ "Distance", "Health", "Threat", "Crosshair" }
+	)
+	self:CreateToggle(cardAcq, "Line-of-Sight Check", "Verifies raycast clearance before acquiring target", "aimbot.visibilityCheck")
+	self:CreateToggle(cardAcq, "Team Filter Check", "Ignores players assigned to local player team", "aimbot.teamCheck")
+	self:CreateToggle(cardAcq, "Target NPCs / Bots", "Acquires valid non-player humanoid characters", "aimbot.targetNPCs")
+
+	-- Card 3: Dynamics & Tracking
+	local cardDyn = self:CreateSectionCard(page, "Dynamics & Tracking", "Field-of-view limits, lerp smoothing, and trajectory prediction")
+	self:CreateSlider(cardDyn, "Field of View (FOV)", nil, "aimbot.fov", 10, 180, false, " deg")
+	self:CreateSlider(cardDyn, "Aim Smoothness", nil, "aimbot.smoothness", 1, 30, false, "x")
+	self:CreateToggle(cardDyn, "Velocity Prediction", "Calculates target movement and velocity compensation", "aimbot.prediction")
+	self:CreateToggle(cardDyn, "Display FOV Circle", "Renders field of view boundary circle", "aimbot.showFOV")
 end
 
 function GUI:PopulateTriggerBotTab()
 	local page = self.Elements.TabPages["TriggerBot"]
-	self:CreateToggle(page, "Enable TriggerBot", "triggerBot.enabled")
-	self:CreateToggle(page, "Require Equipped Tool", "triggerBot.requireTool")
-	self:CreateToggle(page, "Team Check", "triggerBot.teamCheck")
-	self:CreateToggle(page, "Target NPCs", "triggerBot.targetNPCs")
-	self:CreateSlider(page, "Trigger Delay (s)", "triggerBot.delay", 0.01, 0.5, true)
-	self:CreateSlider(page, "Max Trigger Range (studs)", "triggerBot.maxDistance", 100, 3000, false)
+
+	local cardTrigger = self:CreateSectionCard(
+		page,
+		"Automatic Trigger",
+		"Fires instantly upon enemy crosshair alignment"
+	)
+	self:CreateToggle(cardTrigger, "Enable TriggerBot", "Master trigger activation", "triggerBot.enabled")
+	self:CreateToggle(
+		cardTrigger,
+		"Require Equipped Tool",
+		"Only triggers when holding a valid weapon or tool",
+		"triggerBot.requireTool"
+	)
+	self:CreateToggle(cardTrigger, "Team Filter Check", "Prevents firing at teammates", "triggerBot.teamCheck")
+	self:CreateToggle(cardTrigger, "Target NPCs / Bots", "Allows trigger detection on humanoid NPCs", "triggerBot.targetNPCs")
+
+	local cardLimits = self:CreateSectionCard(page, "Timings & Distance", "Firing delays and operational distance boundaries")
+	self:CreateSlider(cardLimits, "Trigger Delay", nil, "triggerBot.delay", 0.01, 0.50, true, "s")
+	self:CreateSlider(cardLimits, "Maximum Distance", nil, "triggerBot.maxDistance", 100, 3000, false, " studs")
 end
 
 function GUI:PopulateVisualsTab()
 	local page = self.Elements.TabPages["Visuals"]
-	self:CreateToggle(page, "Master ESP", "esp.enabled")
-	self:CreateToggle(page, "Show Teammates", "esp.showTeammates")
-	self:CreateToggle(page, "2D Bounding Boxes", "esp.boxes")
-	self:CreateToggle(page, "Bone Skeletons (R6/R15)", "esp.skeleton")
-	self:CreateToggle(page, "Player Tracers", "esp.tracers")
-	self:CreateDropdown(page, "Tracer Origin", "esp.tracerOrigin", { "Bottom", "Center", "Top" })
-	self:CreateToggle(page, "Head Dot", "esp.headDot")
-	self:CreateToggle(page, "Health Bars", "esp.healthBars")
-	self:CreateToggle(page, "Health Text Numbers", "esp.healthText")
-	self:CreateToggle(page, "Names & Tags", "esp.names")
-	self:CreateToggle(page, "Distance Display", "esp.distance")
-	self:CreateToggle(page, "Equipped Weapon Text", "esp.weapons")
-	self:CreateToggle(page, "Target NPC ESP", "esp.targetNPCs")
-	self:CreateSlider(page, "Max ESP Distance", "esp.maxDistance", 100, 3000, false)
+
+	local cardFilter = self:CreateSectionCard(page, "Master Visuals & Filters", "Sensory perception activation and distance culling")
+	self:CreateToggle(cardFilter, "Master ESP", "Master switch for all visual overlays", "esp.enabled")
+	self:CreateToggle(cardFilter, "Render Teammates", "Visualizes friendly players", "esp.showTeammates")
+	self:CreateToggle(cardFilter, "Target NPC Support", "Visualizes non-player humanoid entities", "esp.targetNPCs")
+	self:CreateSlider(cardFilter, "Max Render Distance", nil, "esp.maxDistance", 100, 3000, false, " studs")
+
+	local cardGeometry = self:CreateSectionCard(page, "Geometry & Character Rigs", "Projected boxes, skeletons, and head indicators")
+	self:CreateToggle(cardGeometry, "Bounding Boxes", "Uninverting 3D-to-2D projected boxes", "esp.boxes")
+	self:CreateSegmented(cardGeometry, "Bounding Box Style", "esp.boxType", { "2D", "Corner" })
+	self:CreateToggle(cardGeometry, "Bone Skeletons", "Real-time joint tracking for R6 and R15 rigs", "esp.skeleton")
+	self:CreateToggle(cardGeometry, "Precision Head Dot", "Precision marker placed on target heads", "esp.headDot")
+
+	local cardTracers = self:CreateSectionCard(page, "Tracers & Snaplines", "Directional lines from viewport origin to target")
+	self:CreateToggle(cardTracers, "Enable Tracers", "Draws snapline to tracked entities", "esp.tracers")
+	self:CreateSegmented(cardTracers, "Tracer Origin", "esp.tracerOrigin", { "Bottom", "Center", "Top" })
+
+	local cardInfo = self:CreateSectionCard(page, "HUD Information Overlays", "Health indicators, player names, and inventory status")
+	self:CreateToggle(cardInfo, "Health Bars", "Vertical dynamic health bar indicator", "esp.healthBars")
+	self:CreateToggle(cardInfo, "Numeric Health Text", "Displays numeric HP values", "esp.healthText")
+	self:CreateToggle(cardInfo, "Player Names & Tags", "Displays user handle and display names", "esp.names")
+	self:CreateToggle(cardInfo, "Distance Display", "Displays metric distance in studs", "esp.distance")
+	self:CreateToggle(cardInfo, "Equipped Weapon Display", "Displays currently equipped weapon name", "esp.weapons")
 end
 
 function GUI:PopulateWorldTab()
 	local page = self.Elements.TabPages["World"]
+
+	local cardColors = self:CreateSectionCard(page, "Entity Color Presets", "Configures team and hostile color palettes")
 	self:CreateDropdown(
-		page,
-		"Enemy Color Preset",
+		cardColors,
+		"Hostile Entity Preset",
 		"esp.enemyColor",
 		{ "Red", "Green", "Blue", "Purple", "Yellow", "White" }
 	)
 	self:CreateDropdown(
-		page,
-		"Team Color Preset",
+		cardColors,
+		"Friendly Team Preset",
 		"esp.teamColor",
 		{ "Blue", "Green", "Yellow", "Purple", "Red", "White" }
 	)
-	self:CreateToggle(page, "X-Ray (Wall Transparency)", "world.xrayEnabled")
-	self:CreateSlider(page, "X-Ray Opacity", "world.xrayOpacity", 0.1, 0.9, true)
 
+	local cardXray = self:CreateSectionCard(page, "World X-Ray & Penetration", "Material transparency and map geometry penetration")
+	self:CreateToggle(cardXray, "X-Ray Wall Penetration", "Makes occluding geometry translucent", "world.xrayEnabled")
+	self:CreateSlider(cardXray, "X-Ray Opacity Factor", nil, "world.xrayOpacity", 0.1, 0.9, true)
+
+	local cardTheme = self:CreateSectionCard(page, "Interface Customization", "Window theme tokens and custom wallpaper")
 	local themes = { "Default", "Ruby", "Ocean", "Midnight", "Forest", "Light", "Blue" }
-	self:CreateDropdown(page, "UI Theme Palette", "world.theme", themes, function()
+	self:CreateDropdown(cardTheme, "UI Theme Palette", "world.theme", themes, function(newTheme)
 		self:ApplyTheme()
+		self:ShowToast("Theme switched to: " .. tostring(newTheme), "info")
 	end)
 
-	self:CreateTextInput(page, "BG Image (Asset/URL)", "world.bgImage", "Paste Asset ID or URL...", function(val)
-		if val == "" then
-			self.Elements.BackgroundImage.Image = ""
-			return
+	self:CreateTextInput(
+		cardTheme,
+		"Custom Wallpaper (Asset/URL)",
+		"world.bgImage",
+		"rbxassetid:// or URL...",
+		function(val)
+			if val == "" then
+				self.Elements.BackgroundImage.Image = ""
+				return
+			end
+			local id = string.match(val, "%d+")
+			if id and not string.find(val, "://") then
+				self.Elements.BackgroundImage.Image = "rbxassetid://" .. id
+			else
+				self.Elements.BackgroundImage.Image = val
+			end
 		end
-		local id = string.match(val, "%d+")
-		if id and not string.find(val, "://") then
-			self.Elements.BackgroundImage.Image = "rbxassetid://" .. id
-		else
-			self.Elements.BackgroundImage.Image = val
+	)
+	self:CreateSlider(
+		cardTheme,
+		"Wallpaper Transparency",
+		nil,
+		"world.bgTransparency",
+		0,
+		1,
+		true,
+		nil,
+		function(val)
+			self.Elements.BackgroundImage.ImageTransparency = val
 		end
-	end)
-
-	self:CreateSlider(page, "BG Image Transparency", "world.bgTransparency", 0, 1, true, function(val)
-		self.Elements.BackgroundImage.ImageTransparency = val
-	end)
+	)
 end
 
 function GUI:PopulateAntiCheatTab()
 	local page = self.Elements.TabPages["AntiCheat"]
-	self:CreateToggle(page, "Enable Anti-Detection", "antiDetection.enabled")
-	self:CreateToggle(page, "Humanized Mouse Movement", "antiDetection.humanization")
-	self:CreateToggle(page, "Stealth Mode (Hides Reticles)", "antiDetection.stealthMode")
-	self:CreateSlider(page, "Max Actions Per Second", "antiDetection.maxActionsPerSecond", 10, 60, false)
+
+	local cardAnti = self:CreateSectionCard(
+		page,
+		"Anti-Detection Protocols",
+		"Humanized input trajectories and security isolation"
+	)
+	self:CreateToggle(
+		cardAnti,
+		"Enable Anti-Detection",
+		"Activates humanized motion curves and rate limiters",
+		"antiDetection.enabled"
+	)
+	self:CreateToggle(
+		cardAnti,
+		"Humanized Mouse Curves",
+		"Bezier trajectory and micro-jitter simulation",
+		"antiDetection.humanization"
+	)
+	self:CreateToggle(
+		cardAnti,
+		"Stealth Mode",
+		"Disables visible reticles for clean screen recordings",
+		"antiDetection.stealthMode"
+	)
+
+	local cardThrottle = self:CreateSectionCard(
+		page,
+		"Input Throttling & Limits",
+		"Rate limiting to bypass client heuristics"
+	)
+	self:CreateSlider(
+		cardThrottle,
+		"Max Actions Per Second",
+		nil,
+		"antiDetection.maxActionsPerSecond",
+		10,
+		60,
+		false,
+		"/s"
+	)
+	self:CreateToggle(
+		cardThrottle,
+		"Optimize Rendering Pipeline",
+		"Throttles off-screen visual calculations",
+		"performance.optimizeRendering"
+	)
 end
 
 function GUI:PopulateSettingsTab()
 	local page = self.Elements.TabPages["Settings"]
 	local cfg = self:GetConfigComponent()
 
-	self:CreateActionButton(page, "Save Profile to Disk", "Save Profile", function()
-		if cfg then
-			cfg:Save("default")
+	local cardProfile = self:CreateSectionCard(
+		page,
+		"Profile Management",
+		"Save, restore, or reset settings on persistent storage"
+	)
+	self:CreateActionButton(
+		cardProfile,
+		"Save Configuration Profile",
+		"Writes current configuration to executor storage",
+		"Save Profile",
+		"primary",
+		function()
+			if cfg then
+				cfg:Save("default")
+				self:ShowToast("Configuration profile saved successfully", "success")
+			end
 		end
-	end)
+	)
 
-	self:CreateActionButton(page, "Load Saved Profile", "Load Profile", function()
-		if cfg then
-			cfg:Load("default")
+	self:CreateActionButton(
+		cardProfile,
+		"Load Configuration Profile",
+		"Restores configuration from saved profile",
+		"Load Profile",
+		"secondary",
+		function()
+			if cfg then
+				cfg:Load("default")
+				self:ApplyTheme()
+				self:ShowToast("Configuration profile loaded successfully", "success")
+			end
 		end
-	end)
+	)
 
-	self:CreateActionButton(page, "Restore Factory Defaults", "Reset All", function()
-		if cfg then
-			cfg:Reset()
+	self:CreateActionButton(
+		cardProfile,
+		"Restore Factory Defaults",
+		"Resets all values to pristine default schema",
+		"Reset Defaults",
+		"danger",
+		function()
+			if cfg then
+				cfg:Reset()
+				self:ApplyTheme()
+				self:ShowToast("All settings restored to factory defaults", "warning")
+			end
 		end
-	end)
+	)
 
-	self:CreateActionButton(page, "Emergency Clean Unload", "Unload Script", function()
-		local genv = getGlobalEnv()
-		if genv.AimbotESP and genv.AimbotESP.Unload then
-			genv.AimbotESP:Unload()
+	local cardLifecycle = self:CreateSectionCard(
+		page,
+		"Script Lifecycle",
+		"Clean instance teardown and connection disconnection"
+	)
+	self:CreateActionButton(
+		cardLifecycle,
+		"Emergency Script Unload",
+		"Disconnects all loops and unloads all GUI elements",
+		"Unload Script",
+		"danger",
+		function()
+			local genv = getGlobalEnv()
+			if genv.AimbotESP and genv.AimbotESP.Unload then
+				self:ShowToast("Unloading suite and restoring clean state...", "warning")
+				task.wait(0.2)
+				genv.AimbotESP:Unload()
+			end
 		end
-	end)
+	)
 
-	local infoLabel = createInstance("TextLabel", {
-		Size = UDim2.new(1, -10, 0, 160),
-		BackgroundTransparency = 1,
-		Text = [[🎯 AimBot & ESP Suite v2.1.0
+	local cardHotkeys = self:CreateSectionCard(
+		page,
+		"Centralized Hotkey Reference",
+		"Keyboard shortcuts for instant feature toggling"
+	)
+	local hotkeys = {
+		{ Key = "INSERT / RightShift", Action = "Toggle Configuration Menu" },
+		{ Key = "F1", Action = "Toggle AimBot Master" },
+		{ Key = "F2", Action = "Toggle ESP Visuals" },
+		{ Key = "F3", Action = "Toggle Player Tracers" },
+		{ Key = "F4", Action = "Cycle Aim Target Part" },
+		{ Key = "DELETE", Action = "Emergency Disable All Features" },
+	}
 
-⌨️ Hotkey Controls:
-• INSERT / Right-Shift: Toggle GUI
-• F1: Toggle AimBot
-• F2: Toggle ESP
-• F3: Toggle Tracers
-• F4: Cycle Aim Target Part
-• DELETE: Emergency Disable
+	for _, hk in ipairs(hotkeys) do
+		local row = createInstance("Frame", {
+			Size = UDim2.new(1, 0, 0, 20),
+			BackgroundTransparency = 1,
+			Parent = cardHotkeys,
+		})
+		local keyBadge = createInstance("TextLabel", {
+			Size = UDim2.fromOffset(110, 18),
+			BackgroundColor3 = self:GetActiveTheme().ControlBg,
+			Text = hk.Key,
+			Font = Enum.Font.GothamBold,
+			TextSize = 9,
+			TextColor3 = self:GetActiveTheme().Accent,
+			Parent = row,
+		})
+		createCorner(3, keyBadge)
+		table.insert(self.Elements.ControlBackgrounds, keyBadge)
+		table.insert(self.Elements.Accents, keyBadge)
 
-🛡️ Designed with native executor compatibility, anti-detection throttling, and drawing fallbacks.]],
-		Font = Enum.Font.Gotham,
-		TextSize = 12,
-		TextColor3 = Color3.fromRGB(185, 185, 200),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		Parent = page,
-	})
-	self.Elements.InfoLabel = infoLabel
+		local actionLabel = createInstance("TextLabel", {
+			Size = UDim2.new(1, -120, 1, 0),
+			Position = UDim2.fromOffset(118, 0),
+			BackgroundTransparency = 1,
+			Text = hk.Action,
+			Font = Enum.Font.GothamMedium,
+			TextSize = 10,
+			TextColor3 = self:GetActiveTheme().TextSecondary,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Parent = row,
+		})
+		table.insert(self.Elements.TextSecondary, actionLabel)
+	end
 end
 
--- Create Status Bar at bottom
+--[[------------------------------------------------------------------------------
+    Real-Time Diagnostic Status Bar
+--------------------------------------------------------------------------------]]
+
 function GUI:CreateStatusBar()
 	local theme = self:GetActiveTheme()
 
 	local statusBar = createInstance("Frame", {
 		Name = "StatusBar",
-		Size = UDim2.new(1, -150, 0, 26),
-		Position = UDim2.new(0, 150, 1, -26),
+		Size = UDim2.new(1, -160, 0, 28),
+		Position = UDim2.new(0, 160, 1, -28),
 		BackgroundColor3 = theme.Header,
 		BorderSizePixel = 0,
 		ZIndex = 5,
 		Parent = self.MainFrame,
 	})
-	table.insert(self.Elements.MainFrames, statusBar)
+	table.insert(self.Elements.Headers, statusBar)
+
+	local statusDot = createInstance("Frame", {
+		Name = "StatusDot",
+		Size = UDim2.fromOffset(8, 8),
+		Position = UDim2.new(0, 12, 0.5, -4),
+		BackgroundColor3 = theme.Success,
+		BorderSizePixel = 0,
+		ZIndex = 6,
+		Parent = statusBar,
+	})
+	createCorner(4, statusDot)
+	self.Elements.StatusDot = statusDot
 
 	local statusText = createInstance("TextLabel", {
 		Name = "StatusText",
-		Size = UDim2.new(1, -20, 1, 0),
-		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(1, -30, 1, 0),
+		Position = UDim2.new(0, 26, 0, 0),
 		BackgroundTransparency = 1,
-		Text = "Ready • AimBot: OFF • ESP: OFF",
+		Text = "Ready • AIM: OFF • TRIG: OFF • ESP: OFF",
 		Font = Enum.Font.GothamMedium,
-		TextSize = 11,
+		TextSize = 10,
 		TextColor3 = theme.TextSecondary,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		ZIndex = 6,
 		Parent = statusBar,
 	})
 	self.Elements.StatusText = statusText
+	table.insert(self.Elements.TextSecondary, statusText)
 end
 
--- Apply selected theme to all UI elements
+--[[------------------------------------------------------------------------------
+    Dynamic Theming Engine (Ensures WCAG AA Contrast Compliance)
+--------------------------------------------------------------------------------]]
+
 function GUI:ApplyTheme()
 	local theme = self:GetActiveTheme()
 
@@ -939,42 +1941,135 @@ function GUI:ApplyTheme()
 		self.MainFrame.BackgroundColor3 = theme.Main
 	end
 	if self.Elements.MainStroke then
-		self.Elements.MainStroke.Color = theme.Stroke
+		self.Elements.MainStroke.Color = theme.Border
 	end
 
-	for _, frame in ipairs(self.Elements.MainFrames) do
-		if frame ~= self.MainFrame then
-			frame.BackgroundColor3 = theme.Header
-		end
+	for _, frame in ipairs(self.Elements.Sidebars) do
+		frame.BackgroundColor3 = theme.Sidebar
+	end
+	for _, frame in ipairs(self.Elements.Headers) do
+		frame.BackgroundColor3 = theme.Header
+	end
+	for _, card in ipairs(self.Elements.Cards) do
+		card.BackgroundColor3 = theme.Card
+	end
+	for _, stroke in ipairs(self.Elements.CardBorders) do
+		stroke.Color = theme.CardBorder
+	end
+	for _, text in ipairs(self.Elements.TextPrimary) do
+		text.TextColor3 = theme.Text
+	end
+	for _, text in ipairs(self.Elements.TextSecondary) do
+		text.TextColor3 = theme.TextSecondary
+	end
+
+	for _, elem in ipairs(self.Elements.ControlBackgrounds) do
+		elem.BackgroundColor3 = theme.ControlBg
 	end
 
 	for _, elem in ipairs(self.Elements.Accents) do
-		if type(elem) == "table" and elem.Type == "Toggle" then
-			local cfg = self:GetConfigComponent()
-			local state = cfg and cfg:Get(elem.ConfigPath) or false
-			elem.Update(state)
-		elseif typeof(elem) == "Instance" then
-			if elem:IsA("TextLabel") or elem:IsA("TextButton") then
-				if elem.Name == "Title" or elem == self.OpenBtn then
-					elem.TextColor3 = theme.Accent
-				elseif
-					elem.BackgroundColor3 ~= Color3.fromRGB(230, 60, 60)
-					and elem.BackgroundColor3 ~= Color3.fromRGB(55, 55, 65)
-				then
-					elem.BackgroundColor3 = theme.Accent
-				end
-			elseif elem:IsA("Frame") then
-				elem.BackgroundColor3 = theme.Accent
-			end
+		if elem:IsA("TextLabel") or elem:IsA("TextButton") then
+			elem.TextColor3 = theme.Accent
+		elseif elem:IsA("Frame") then
+			elem.BackgroundColor3 = theme.Accent
 		end
 	end
 
-	if self.Elements.TabButtons[self.CurrentTab] then
-		self.Elements.TabButtons[self.CurrentTab].BackgroundColor3 = theme.Accent
+	-- Update toggles
+	for _, t in ipairs(self.Elements.Toggles) do
+		local cfg = self:GetConfigComponent()
+		local state = cfg and cfg:Get(t.ConfigPath) or false
+		t.Update(state)
+		if t.Stroke then
+			t.Stroke.Color = theme.CardBorder
+		end
 	end
+
+	-- Update sliders
+	for _, s in ipairs(self.Elements.Sliders) do
+		local cfg = self:GetConfigComponent()
+		local val = cfg and cfg:Get(s.ConfigPath) or s.Min
+		local pct = math.clamp((val - s.Min) / (s.Max - s.Min), 0, 1)
+		s.Fill.Size = UDim2.new(pct, 0, 1, 0)
+		s.Fill.BackgroundColor3 = theme.Accent
+		s.Pill.Text = tostring(val) .. (s.Unit or "")
+		s.Pill.TextColor3 = theme.Accent
+		s.Pill.BackgroundColor3 = theme.ControlBg
+	end
+
+	-- Update segmented controls
+	for _, seg in ipairs(self.Elements.Segments) do
+		local cfg = self:GetConfigComponent()
+		local cur = tostring(cfg and cfg:Get(seg.ConfigPath) or "")
+		seg.Update(cur)
+	end
+
+	-- Re-highlight current active tab button
+	self:SwitchTab(self.CurrentTab)
 end
 
--- Centralized Hotkey Listener (INSERT, RightShift, F1, F2, F3, F4, DELETE)
+--[[------------------------------------------------------------------------------
+    Viewport Clamping & Dragging Setup
+--------------------------------------------------------------------------------]]
+
+function GUI:SetupDragging()
+	local dragging = false
+	local dragStart = nil
+	local startPos = nil
+
+	local header = self.Elements.HeaderBar or self.MainFrame
+	header.InputBegan:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
+			dragging = true
+			dragStart = input.Position
+			startPos = self.MainFrame.Position
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if
+			dragging
+			and (
+				input.UserInputType == Enum.UserInputType.MouseMovement
+				or input.UserInputType == Enum.UserInputType.Touch
+			)
+		then
+			local delta = input.Position - dragStart
+			local winWidth = self.MainFrame.AbsoluteSize.X
+			local winHeight = self.MainFrame.AbsoluteSize.Y
+			local viewport = Camera and Camera.ViewportSize or Vector2.new(1920, 1080)
+
+			local newOffsetX = startPos.X.Offset + delta.X
+			local newOffsetY = startPos.Y.Offset + delta.Y
+
+			-- Screen boundary clamping to prevent window loss
+			local screenPosX = (startPos.X.Scale * viewport.X) + newOffsetX
+			local screenPosY = (startPos.Y.Scale * viewport.Y) + newOffsetY
+
+			local clampedScreenX = math.clamp(screenPosX, 0, math.max(0, viewport.X - winWidth))
+			local clampedScreenY = math.clamp(screenPosY, 0, math.max(0, viewport.Y - winHeight))
+
+			self.MainFrame.Position = UDim2.fromOffset(clampedScreenX, clampedScreenY)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
+			dragging = false
+		end
+	end)
+end
+
+--[[------------------------------------------------------------------------------
+    Centralized Hotkeys with Visual Toast Feedback
+--------------------------------------------------------------------------------]]
+
 function GUI:SetupHotkeys()
 	for _, conn in ipairs(self.KeybindConnections) do
 		conn:Disconnect()
@@ -989,7 +2084,7 @@ function GUI:SetupHotkeys()
 		local cfg = self:GetConfigComponent()
 		local genv = getGlobalEnv()
 
-		-- GUI Toggle: INSERT or RightShift
+		-- Menu Toggle: INSERT or RightShift
 		if input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightShift then
 			self:SetVisible(not self.IsVisible)
 		end
@@ -997,24 +2092,24 @@ function GUI:SetupHotkeys()
 		-- Aimbot Toggle: F1
 		if input.KeyCode == Enum.KeyCode.F1 and cfg then
 			local state = cfg:Toggle("aimbot.enabled")
-			print("🎯 AimBot toggled: " .. (state and "ON" or "OFF"))
+			self:ShowToast("AimBot toggled: " .. (state and "ON" or "OFF"), state and "success" or "info")
 		end
 
 		-- ESP Toggle: F2
 		if input.KeyCode == Enum.KeyCode.F2 and cfg then
 			local state = cfg:Toggle("esp.enabled")
-			print("👁️ ESP toggled: " .. (state and "ON" or "OFF"))
+			self:ShowToast("ESP toggled: " .. (state and "ON" or "OFF"), state and "success" or "info")
 		end
 
 		-- Tracers Toggle: F3
 		if input.KeyCode == Enum.KeyCode.F3 and cfg then
 			local state = cfg:Toggle("esp.tracers")
-			print("📍 Tracers toggled: " .. (state and "ON" or "OFF"))
+			self:ShowToast("Tracers toggled: " .. (state and "ON" or "OFF"), state and "success" or "info")
 		end
 
-		-- Target Part Cycle: F4 (Head -> Torso -> Smart -> HumanoidRootPart)
+		-- Target Part Cycle: F4 (Head -> Torso -> Smart -> RootPart)
 		if input.KeyCode == Enum.KeyCode.F4 and cfg then
-			local parts = { "Head", "Torso", "Smart", "HumanoidRootPart" }
+			local parts = { "Head", "Torso", "Smart", "RootPart" }
 			local current = cfg:Get("aimbot.targetPart") or "Head"
 			local idx = 1
 			for i, p in ipairs(parts) do
@@ -1025,15 +2120,19 @@ function GUI:SetupHotkeys()
 			end
 			local nextPart = parts[(idx % #parts) + 1]
 			cfg:Set("aimbot.targetPart", nextPart)
-			print("🎯 Target part cycled to: " .. nextPart)
+			self:ShowToast("Target part cycled to: " .. nextPart, "info")
 		end
 
-		-- Emergency Disable: DELETE
+		-- Emergency Kill Switch: DELETE
 		if input.KeyCode == Enum.KeyCode.Delete then
 			if genv.AimbotESP and genv.AimbotESP.State then
 				genv.AimbotESP.State.EmergencyDisabled = not genv.AimbotESP.State.EmergencyDisabled
 				local isEm = genv.AimbotESP.State.EmergencyDisabled
-				warn(isEm and "🚨 EMERGENCY DISABLE ACTIVATED" or "✅ Emergency disable deactivated")
+				if isEm then
+					self:ShowToast("EMERGENCY KILL SWITCH ACTIVATED", "danger", 4.0)
+				else
+					self:ShowToast("Emergency kill switch deactivated", "success", 3.0)
+				end
 			end
 		end
 	end)
@@ -1041,37 +2140,10 @@ function GUI:SetupHotkeys()
 	table.insert(self.KeybindConnections, conn)
 end
 
--- Draggable title bar setup
-function GUI:SetupDragging()
-	local dragging = false
-	local dragStart = nil
-	local startPos = nil
+--[[------------------------------------------------------------------------------
+    Visibility, Diagnostic Update & Lifecycle
+--------------------------------------------------------------------------------]]
 
-	local header = self.Elements.HeaderBar or self.MainFrame
-	header.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			dragStart = input.Position
-			startPos = self.MainFrame.Position
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local delta = input.Position - dragStart
-			self.MainFrame.Position =
-				UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-		end
-	end)
-
-	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-		end
-	end)
-end
-
--- Set GUI Visibility
 function GUI:SetVisible(visible)
 	self.IsVisible = visible
 	if self.MainFrame then
@@ -1082,7 +2154,6 @@ function GUI:SetVisible(visible)
 	end
 end
 
--- Update Status Bar
 function GUI:UpdateStatus()
 	if not self.Elements.StatusText then
 		return
@@ -1090,11 +2161,19 @@ function GUI:UpdateStatus()
 
 	local genv = getGlobalEnv()
 	local cfg = self:GetConfigComponent()
+	local theme = self:GetActiveTheme()
 
 	if genv.AimbotESP and genv.AimbotESP.State and genv.AimbotESP.State.EmergencyDisabled then
-		self.Elements.StatusText.Text = "🚨 EMERGENCY DISABLED (Press DELETE to re-enable)"
-		self.Elements.StatusText.TextColor3 = Color3.fromRGB(255, 60, 60)
+		self.Elements.StatusText.Text = "EMERGENCY DISABLED (Press DELETE to restore)"
+		self.Elements.StatusText.TextColor3 = theme.Danger
+		if self.Elements.StatusDot then
+			self.Elements.StatusDot.BackgroundColor3 = theme.Danger
+		end
 		return
+	end
+
+	if self.Elements.StatusDot then
+		self.Elements.StatusDot.BackgroundColor3 = theme.Success
 	end
 
 	local aimStatus = (cfg and cfg:Get("aimbot.enabled")) and "ON" or "OFF"
@@ -1104,23 +2183,33 @@ function GUI:UpdateStatus()
 	local aimbotComp = genv.AimbotESP and genv.AimbotESP.Components and genv.AimbotESP.Components.Aimbot
 	local targetInfo = aimbotComp and aimbotComp:GetCurrentTargetInfo()
 
-	local statusStr = string.format("Ready • Aim: %s • Trig: %s • ESP: %s", aimStatus, trigStatus, espStatus)
+	local statusStr = string.format("Ready • AIM: %s • TRIG: %s • ESP: %s", aimStatus, trigStatus, espStatus)
 	if targetInfo then
 		statusStr = statusStr .. string.format(" • Locked: %s [%dm]", targetInfo.name, targetInfo.distance)
 	end
 
 	self.Elements.StatusText.Text = statusStr
-	self.Elements.StatusText.TextColor3 = self:GetActiveTheme().TextSecondary
+	self.Elements.StatusText.TextColor3 = theme.TextSecondary
 end
 
--- Main update loop
 function GUI:Update()
 	if self.IsVisible then
 		self:UpdateStatus()
 	end
 end
 
--- Cleanup function
+function GUI:Initialize()
+	self:CreateScreenGui()
+	self:CreateMainInterface()
+	self:CreateTabs()
+	self:CreateStatusBar()
+	self:SetupDragging()
+	self:SetupHotkeys()
+	self:ApplyTheme()
+	self:SetVisible(true)
+	print("[GUI] APEX SUITE v2.2 initialized successfully")
+end
+
 function GUI:Cleanup()
 	for _, conn in ipairs(self.KeybindConnections) do
 		conn:Disconnect()
@@ -1134,12 +2223,24 @@ function GUI:Cleanup()
 
 	self.MainFrame = nil
 	self.OpenBtn = nil
+	self.ToastContainer = nil
 	self.Elements = {
+		Frames = {},
+		Sidebars = {},
+		Headers = {},
+		Cards = {},
+		CardBorders = {},
+		TextPrimary = {},
+		TextSecondary = {},
+		Accents = {},
+		ControlBackgrounds = {},
+		ControlBorders = {},
 		TabButtons = {},
 		TabPages = {},
-		Accents = {},
-		MainFrames = {},
-		Controls = {},
+		Toggles = {},
+		Sliders = {},
+		Segments = {},
+		StatusDots = {},
 	}
 	self.IsVisible = false
 end
