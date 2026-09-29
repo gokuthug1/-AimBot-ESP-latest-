@@ -9,7 +9,9 @@
 loadstring(game:HttpGet("https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP-latest-/main/src/main.lua"))()
 
 -- Wait for system to load
-repeat wait() until getgenv().AimbotESP and getgenv().AimbotESP.Loaded
+repeat
+	wait()
+until getgenv().AimbotESP and getgenv().AimbotESP.Loaded
 
 print("🎯 AimBot & ESP System Loaded!")
 print("📋 Basic Controls:")
@@ -23,17 +25,17 @@ local config = getgenv().AimbotESP.Components.Config
 
 -- Basic AimBot setup
 config:Set("aimbot.enabled", true)
-config:Set("aimbot.fov", 90)           -- 90 degree field of view
-config:Set("aimbot.smoothness", 10)    -- Smooth aiming
+config:Set("aimbot.fov", 90) -- 90 degree field of view
+config:Set("aimbot.smoothness", 10) -- Smooth aiming
 config:Set("aimbot.targetPart", "Head") -- Target head for precision
 
 -- Basic ESP setup
 config:Set("esp.enabled", true)
-config:Set("esp.boxes", true)          -- Show player boxes
-config:Set("esp.names", true)          -- Show player names
-config:Set("esp.healthBars", true)     -- Show health bars
-config:Set("esp.distance", true)       -- Show distance
-config:Set("esp.maxDistance", 400)     -- ESP range: 400 studs
+config:Set("esp.boxes", true) -- Show player boxes
+config:Set("esp.names", true) -- Show player names
+config:Set("esp.healthBars", true) -- Show health bars
+config:Set("esp.distance", true) -- Show distance
+config:Set("esp.maxDistance", 400) -- ESP range: 400 studs
 
 -- Enable anti-detection for safety
 config:Set("antiDetection.enabled", true)

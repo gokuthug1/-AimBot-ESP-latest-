@@ -2,9 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Lua](https://img.shields.io/badge/Language-Lua-blue.svg)](https://www.lua.org/)
-[![Version](https://img.shields.io/badge/Version-2.0.0-green.svg)](https://github.com/gokuthug1/-AimBot-ESP-latest-)
+[![Version](https://img.shields.io/badge/Version-2.1.0-green.svg)](https://github.com/gokuthug1/-AimBot-ESP-latest-)
 
-A sophisticated, modular AimBot and ESP (Extra Sensory Perception) system for Roblox with advanced features, anti-detection mechanisms, and extensive customization options.
+A sophisticated, modular AimBot, TriggerBot, and ESP (Extra Sensory Perception) system for Roblox with advanced features, multi-layered anti-detection mechanisms, dual-engine Drawing/GUI rendering, and extensive customization options.
 
 ## ⚠️ IMPORTANT DISCLAIMER
 
@@ -18,48 +18,53 @@ A sophisticated, modular AimBot and ESP (Extra Sensory Perception) system for Ro
 
 ## ✨ Features
 
-### 🎯 AimBot System
-- **Smart Target Selection**: Prioritizes closest enemies or lowest health targets
-- **Smooth Aiming**: Natural mouse movement simulation
-- **Prediction System**: Advanced trajectory calculation for moving targets
-- **FOV Limiting**: Configurable field of view restrictions
-- **Anti-Detection**: Randomized timing and human-like behavior
-- **Multiple Aim Modes**: Head, torso, or smart body part selection
+### 🎯 AimBot & TriggerBot System
+- **Multi-Mode Aiming**: Camera CFrame Lerp (FPS/LockCenter games like Arsenal/PF), MouseMoveRel, or Hybrid
+- **Smart Target Selection**: Prioritizes closest enemies, lowest health, threat score, or crosshair distance
+- **TriggerBot**: Universal automatic firing upon enemy crosshair alignment with tool & NPC filters
+- **Smooth Aiming & Jitter Suppression**: Natural mouse movement and lerp simulation
+- **Prediction System**: Advanced linear and quadratic velocity trajectory calculation for moving targets
+- **FOV Limiting & Drawing Circle**: Configurable field of view with Drawing API & ScreenGui fallback
+- **Multiple Aim Modes**: Head, Torso, Smart, or HumanoidRootPart selection
+- **Target Indicator**: Dynamic reticle on current locked target
 
-### 👁️ ESP (Extra Sensory Perception)
-- **Player ESP**: See players through walls with customizable colors
-- **Health Bars**: Real-time health visualization
-- **Distance Display**: Shows distance to all players
-- **Name Tags**: Player names with team colors
-- **Skeleton ESP**: Bone structure visualization
-- **Box ESP**: 2D/3D bounding boxes around players
-- **Tracers**: Lines pointing to enemy locations
+### 👁️ ESP (Extra Sensory Perception) & Visuals
+- **3D-to-2D Bounding Boxes**: 8-corner projected bounding boxes that never collapse or invert at vertical angles
+- **Bone Skeletons**: Real-time bone visualization for both R6 and R15 character rigs
+- **Mathematically Centered Tracers**: Snaplines with Bottom, Center, and Top origin points
+- **Health Bars & Text**: Real-time health visualization with color gradients
+- **Name Tags & Distance**: Player names, display names, and distance indicators
+- **Equipped Weapon Display**: Detects and displays weapon in hand or Unarmed status
+- **Head Dot**: Precision indicator directly on player heads
+- **X-Ray / Wall Chams**: Transparent map geometry with pristine material/transparency restoration
+- **Target NPC Support**: Full ESP and aim support for non-player humanoid characters
+- **Dual-Engine Rendering**: Drawing API for zero GUI footprint, with automatic ScreenGui fallback
 
 ### 🛡️ Anti-Detection Features
-- **Randomized Delays**: Human-like timing variations
-- **Smooth Transitions**: Natural movement patterns
-- **Detection Avoidance**: Smart behavior to avoid anti-cheat
-- **Rate Limiting**: Prevents suspicious rapid actions
-- **Stealth Mode**: Minimal visual indicators
+- **Humanized Movement Curves**: Natural Bezier curves, micro-overshoot, and tremor simulation
+- **Action Rate Limiting**: Throttles aim, shoot, and movement frequencies
+- **Suspicion Tracking**: Proactive suspicion level monitoring with asynchronous safety protocol
+- **Stealth Mode**: Disables visible indicators for security and clean screen capture
 
-### ⚙️ Advanced Configuration
-- **GUI Interface**: Easy-to-use configuration menu
-- **Hotkey System**: Customizable key bindings
-- **Profile System**: Save and load different configurations
-- **Real-time Adjustments**: Modify settings during gameplay
+### ⚙️ Advanced Configuration & UI
+- **Next-Gen GUI**: Modern sidebar tabs, animated minimize-to-pill transition, and customizable background image
+- **Theme Engine**: 7 color palettes (Default, Ruby, Ocean, Midnight, Forest, Light, Blue)
+- **Centralized Hotkeys**: Instant keyboard toggles for all core features
+- **Persistent Profile System**: Save and load profiles to executor filesystem (`writefile`/`readfile`)
+- **Real-Time Synchronizer**: Live state updates across all modules
 
 ## 🚀 Installation
 
-### Method 1: Script Executor
-1. Download a Roblox script executor (Synapse X, KRNL, etc.)
+### Method 1: Script Executor (Recommended)
+1. Download a Roblox script executor (Synapse X, KRNL, Script-Ware, Wave, Delta, etc.)
 2. Copy the contents of `src/main.lua`
-3. Paste into your executor and run
+3. Paste into your executor and execute
 
 ### Method 2: Auto-Execute
 1. Place `main.lua` in your executor's autoexec folder
 2. Restart Roblox for automatic loading
 
-### Method 3: Loadstring (Recommended)
+### Method 3: Loadstring
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP-latest-/main/src/main.lua"))()
 ```
@@ -68,17 +73,17 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP
 
 ### Basic Usage
 1. Execute the script in your preferred Roblox game
-2. Press `INSERT` to open the configuration GUI
+2. Press `INSERT` or `Right-Shift` to open the configuration GUI
 3. Adjust settings to your preference
 4. Press `F1` to toggle AimBot
 5. Press `F2` to toggle ESP
 
 ### Hotkeys (Default)
-- `INSERT` - Toggle Configuration GUI
+- `INSERT` / `RightShift` - Toggle Configuration GUI
 - `F1` - Toggle AimBot
 - `F2` - Toggle ESP
 - `F3` - Toggle Tracers
-- `F4` - Cycle Aim Target (Head/Torso/Smart)
+- `F4` - Cycle Aim Target Part (Head → Torso → Smart → HumanoidRootPart)
 - `DELETE` - Emergency Disable All Features
 
 ### Configuration Options
@@ -86,20 +91,28 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP
 #### AimBot Settings
 - **Enable**: Toggle AimBot on/off
 - **Aim Key**: Key to hold for aiming (default: Right Mouse Button)
-- **Target Part**: Head, Torso, or Smart selection
+- **Aim Mode**: Hybrid, Camera CFrame, or MouseMoveRel
+- **Target Part**: Head, Torso, Smart, or HumanoidRootPart
 - **FOV**: Field of view circle (10-180 degrees)
-- **Smoothness**: Aim smoothing factor (1-20)
-- **Prediction**: Enable target movement prediction
+- **Smoothness**: Aim smoothing factor (1-30)
+- **Prediction**: Enable target movement velocity prediction
 - **Team Check**: Ignore teammates
+- **Target NPCs**: Target non-player humanoids
+
+#### TriggerBot Settings
+- **Enable**: Toggle TriggerBot on/off
+- **Delay**: Delay between shots in seconds (0.01 - 0.5s)
+- **Require Tool**: Only fire when holding a weapon tool
 
 #### ESP Settings
-- **Enable**: Toggle ESP on/off
-- **Players**: Show player boxes and names
-- **Health Bars**: Display health information
-- **Distance**: Show distance to players
-- **Tracers**: Lines to players
-- **Skeleton**: Bone structure display
-- **Team Colors**: Use team-based colors
+- **Enable**: Master toggle for all visuals
+- **Boxes**: 2D bounding boxes around targets
+- **Skeletons**: Bone joints for R6 and R15 characters
+- **Tracers**: Snaplines to players (Bottom, Center, Top origin)
+- **Health Bars**: Health bar and numeric text
+- **Names & Distances**: Player tags and distance
+- **Weapon Text**: Show equipped weapon
+- **X-Ray**: See players through translucent walls
 
 ## 📁 Project Structure
 
