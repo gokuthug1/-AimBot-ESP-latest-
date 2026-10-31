@@ -528,13 +528,19 @@ function Utils:ScanGreenOutlinePlayers()
 			end
 		end
 
-		-- Also scan for SelectionBox objects in Workspace targeting this character
+		-- Also scan Workspace for Highlight/SelectionBox with Adornee pointing at this character
+		-- (some ESP systems parent these to Workspace/CoreGui instead of the character)
 		if not foundGreen then
 			for _, inst in ipairs(Workspace:GetDescendants()) do
 				if foundGreen then break end
-				if inst:IsA("SelectionBox") then
-					local adornee = inst.Adornee
-					if adornee and (adornee == character or (adornee:IsA("Instance") and adornee:IsDescendantOf(character))) then
+				local adornee = nil
+				pcall(function() adornee = inst.Adornee end)
+				if adornee and (adornee == character or (typeof(adornee) == "Instance" and adornee:IsDescendantOf(character))) then
+					if inst:IsA("Highlight") then
+						if self:IsGreenColor(inst.OutlineColor) or self:IsGreenColor(inst.FillColor) then
+							foundGreen = true
+						end
+					elseif inst:IsA("SelectionBox") then
 						if self:IsGreenColor(inst.Color3) or self:IsGreenColor(inst.SurfaceColor3) then
 							foundGreen = true
 						end
