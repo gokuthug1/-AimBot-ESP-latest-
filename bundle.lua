@@ -1,7 +1,122 @@
 --[[
-    Advanced AimBot & ESP Suite v2.2.0 (Standalone All-In-One Bundle)
+    Advanced AimBot & ESP Suite v2.2.0 (Standalone All-In-One Master)
     Zero external dependencies - runs 100% natively offline in any Roblox executor
 ]]
+
+--[[----------------------------------------------------------------------------------
+    Advanced AimBot & ESP Suite v2.1.0 (Universal Native Master)
+    
+    A sophisticated, modular AimBot, TriggerBot, and ESP system for Roblox:
+    - Universal target selection, prediction, smoothing, and aim locking
+    - Dual-engine visuals: Drawing API with ScreenGui fallback
+    - Multi-mode aim: Camera CFrame (FPS/LockCenter), MouseMoveRel, and Hybrid
+    - Advanced ESP: 2D Bounding Boxes, Midpoint Tracers, Skeletons, Health Bars, Head Dots
+    - Multi-layered Anti-Detection: humanized Bezier movement, jitter, rate limiting, stealth mode
+    - Next-gen UI with real-time themes, minimize-to-pill, and custom background image support
+    - Centralized hotkeys: INSERT / RightShift (GUI), F1 (Aim), F2 (ESP), F3 (Tracers), F4 (Target), DELETE (Emergency)
+    
+    Author: gokuthug1
+    License: MIT
+------------------------------------------------------------------------------------]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then
+	local startWait = tick()
+	while not LocalPlayer and (tick() - startWait) < 5 do
+		task.wait(0.1)
+		LocalPlayer = Players.LocalPlayer
+	end
+end
+
+local Camera = Workspace.CurrentCamera
+
+Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+	Camera = Workspace.CurrentCamera
+end)
+
+-- Universal Global Environment
+local genv = (type(getgenv) == "function" and getgenv()) or _G
+
+-- Prevent multiple simultaneous instances & handle clean reload
+if genv.AimbotESP and genv.AimbotESP.Loaded then
+	warn("⚠️ [AimbotESP] Previous instance detected. Performing clean reload...")
+	if genv.AimbotESP.Unload then
+		pcall(function()
+			genv.AimbotESP:Unload()
+		end)
+	end
+	task.wait(0.2)
+end
+
+-- Initialize Global Suite Namespace
+genv.AimbotESP = {
+	Version = "2.1.0",
+	BuildDate = "2026-09-28",
+	Loaded = false,
+	Components = {},
+	Config = {},
+	State = {
+		AimbotEnabled = false,
+		ESPEnabled = false,
+		GUIVisible = true,
+		EmergencyDisabled = false,
+		Initialized = false,
+	},
+	ActiveNPCs = {},
+	Connections = {},
+	Debug = {
+		ErrorCount = 0,
+		LastError = nil,
+		StartTime = tick(),
+	},
+}
+
+-- Backward compatibility aliases
+genv.AIMBOT_ESP_LOADED = true
+genv.UltimateSuiteLoaded = true
+
+--[[------------------------------------------------------------------------------
+    Active NPC Detection & Management
+--------------------------------------------------------------------------------]]
+
+local function registerNPC(descendant)
+	if descendant:IsA("Humanoid") and descendant.Parent and descendant.Parent:IsA("Model") then
+		local char = descendant.Parent
+		if char ~= (LocalPlayer and LocalPlayer.Character) and not Players:GetPlayerFromCharacter(char) then
+			if not table.find(genv.AimbotESP.ActiveNPCs, char) then
+				table.insert(genv.AimbotESP.ActiveNPCs, char)
+			end
+		end
+	end
+end
+
+task.spawn(function()
+	for _, desc in ipairs(Workspace:GetDescendants()) do
+		registerNPC(desc)
+	end
+end)
+
+local npcAddConn = Workspace.DescendantAdded:Connect(registerNPC)
+table.insert(genv.AimbotESP.Connections, npcAddConn)
+
+local npcRemoveConn = Workspace.DescendantRemoving:Connect(function(descendant)
+	if descendant:IsA("Model") then
+		local idx = table.find(genv.AimbotESP.ActiveNPCs, descendant)
+		if idx then
+			table.remove(genv.AimbotESP.ActiveNPCs, idx)
+		end
+	end
+end)
+table.insert(genv.AimbotESP.Connections, npcRemoveConn)
+
+
+--[[------------------------------------------------------------------------------
+    Embedded Standalone Modules
+--------------------------------------------------------------------------------]]
 
 local _MODULE_CACHE = {}
 
@@ -5850,15 +5965,15 @@ return GUI
 
 end)()
 
-
 local function loadModule(name, fileName)
 	if _MODULE_CACHE and _MODULE_CACHE[name] then
 		return _MODULE_CACHE[name]
 	end
+	error("Critical module [" .. tostring(name) .. "] missing from standalone bundle.")
 	return nil
 end
 
-print("🚀 [AimbotESP] Initializing Suite v" .. genv.AimbotESP.Version .. "...")
+print("🚀 [AimbotESP] Initializing Suite v" .. genv.AimbotESP.Version .. " (Standalone Bundle)...")
 
 -- 1. Load Utils
 local Utils = loadModule("Utils", "utils.lua")

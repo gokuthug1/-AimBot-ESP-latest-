@@ -20,10 +20,9 @@ local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 if not LocalPlayer then
-	pcall(function()
-		LocalPlayer = Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
-	end)
-	if not LocalPlayer then
+	local startWait = tick()
+	while not LocalPlayer and (tick() - startWait) < 5 do
+		task.wait(0.1)
 		LocalPlayer = Players.LocalPlayer
 	end
 end
@@ -117,6 +116,16 @@ table.insert(genv.AimbotESP.Connections, npcRemoveConn)
 --------------------------------------------------------------------------------]]
 
 local GITHUB_REPO = "https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP-latest-/main/src/"
+local BUNDLE_URL = "https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP-latest-/main/bundle.lua"
+
+-- Fast path: When running over network without local files, stream the single-file bundle
+-- This avoids multiple HTTP round-trips and executor rate-limits
+local hasLocalFiles = false
+if type(readfile) == "function" and type(isfile) == "function" then
+	pcall(function()
+		hasLocalFiles = isfile("src/utils.lua") or isfile("utils.lua")
+	end)
+end
 
 -- Universal HTTP Fetcher supporting all executors (game:HttpGet, request, http_request, syn.request, http.request)
 local function fetchHttp(url)
@@ -207,6 +216,19 @@ end
 --[[------------------------------------------------------------------------------
     Component Resolution & Fallbacks
 --------------------------------------------------------------------------------]]
+
+-- If not running from local files, load the complete pre-compiled bundle in one atomic step
+if not hasLocalFiles then
+	local bundleCode = fetchHttp(BUNDLE_URL)
+	if bundleCode and #bundleCode > 1000 then
+		local bundleFunc, parseErr = loadstring(bundleCode)
+		if bundleFunc then
+			return bundleFunc()
+		else
+			warn("⚠️ Bundle parse failed: " .. tostring(parseErr) .. ", falling back to modular load")
+		end
+	end
+end
 
 print("🚀 [AimbotESP] Initializing Suite v" .. genv.AimbotESP.Version .. "...")
 
