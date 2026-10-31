@@ -48,6 +48,7 @@ A sophisticated, modular AimBot, TriggerBot, and ESP (Extra Sensory Perception) 
 
 ### ⚙️ Advanced Configuration & UI
 - **Next-Gen GUI**: Modern sidebar tabs, animated minimize-to-pill transition, and customizable background image
+- **Player Blacklist & Pick List Manager**: Dedicated GUI tab featuring a live server player list with avatar headshots, real-time search filtering, one-click Blacklist/Unignore toggles, manual username entry, and bulk actions (completely ignores blacklisted players across AimBot, TriggerBot, and ESP)
 - **Theme Engine**: 7 color palettes (Default, Ruby, Ocean, Midnight, Forest, Light, Blue)
 - **Centralized Hotkeys**: Instant keyboard toggles for all core features
 - **Persistent Profile System**: Save and load profiles to executor filesystem (`writefile`/`readfile`)

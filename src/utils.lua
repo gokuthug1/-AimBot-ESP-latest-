@@ -691,12 +691,66 @@ end
 
 -- Convenience: add a player to the ignore list (accepts object or name string)
 function Utils:IgnorePlayer(playerOrName)
+	if not playerOrName then
+		return
+	end
 	self.IgnoredPlayers[playerOrName] = true
+	if typeof(playerOrName) == "Instance" and playerOrName:IsA("Player") then
+		self.IgnoredPlayers[playerOrName.Name] = true
+	end
 end
 
 -- Convenience: remove a player from the ignore list (accepts object or name string)
 function Utils:UnignorePlayer(playerOrName)
+	if not playerOrName then
+		return
+	end
 	self.IgnoredPlayers[playerOrName] = nil
+	if typeof(playerOrName) == "Instance" and playerOrName:IsA("Player") then
+		self.IgnoredPlayers[playerOrName.Name] = nil
+	elseif type(playerOrName) == "string" then
+		for k, _ in pairs(self.IgnoredPlayers) do
+			if typeof(k) == "Instance" and k:IsA("Player") and k.Name == playerOrName then
+				self.IgnoredPlayers[k] = nil
+			end
+		end
+	end
+end
+
+-- Convenience: toggle a player's ignore status, returning new state (true = ignored, false = active)
+function Utils:ToggleIgnoredPlayer(playerOrName)
+	if self:IsIgnored(playerOrName) then
+		self:UnignorePlayer(playerOrName)
+		return false
+	else
+		self:IgnorePlayer(playerOrName)
+		return true
+	end
+end
+
+-- Convenience: clear all ignored players
+function Utils:ClearIgnoredPlayers()
+	table.clear(self.IgnoredPlayers)
+	local genv = self:GetGenEnv()
+	local config = genv.AimbotESP and genv.AimbotESP.Config
+	if config and config.aimbot and type(config.aimbot.ignoredPlayers) == "table" then
+		table.clear(config.aimbot.ignoredPlayers)
+	end
+end
+
+-- Convenience: get table of all currently blacklisted names/identifiers
+function Utils:GetIgnoredList()
+	local list = {}
+	for k, v in pairs(self.IgnoredPlayers) do
+		if v then
+			if typeof(k) == "Instance" and k:IsA("Player") then
+				list[k.Name] = true
+			elseif type(k) == "string" then
+				list[k] = true
+			end
+		end
+	end
+	return list
 end
 
 --[[------------------------------------------------------------------------------

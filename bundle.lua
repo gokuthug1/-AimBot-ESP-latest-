@@ -815,12 +815,66 @@ end
 
 -- Convenience: add a player to the ignore list (accepts object or name string)
 function Utils:IgnorePlayer(playerOrName)
+	if not playerOrName then
+		return
+	end
 	self.IgnoredPlayers[playerOrName] = true
+	if typeof(playerOrName) == "Instance" and playerOrName:IsA("Player") then
+		self.IgnoredPlayers[playerOrName.Name] = true
+	end
 end
 
 -- Convenience: remove a player from the ignore list (accepts object or name string)
 function Utils:UnignorePlayer(playerOrName)
+	if not playerOrName then
+		return
+	end
 	self.IgnoredPlayers[playerOrName] = nil
+	if typeof(playerOrName) == "Instance" and playerOrName:IsA("Player") then
+		self.IgnoredPlayers[playerOrName.Name] = nil
+	elseif type(playerOrName) == "string" then
+		for k, _ in pairs(self.IgnoredPlayers) do
+			if typeof(k) == "Instance" and k:IsA("Player") and k.Name == playerOrName then
+				self.IgnoredPlayers[k] = nil
+			end
+		end
+	end
+end
+
+-- Convenience: toggle a player's ignore status, returning new state (true = ignored, false = active)
+function Utils:ToggleIgnoredPlayer(playerOrName)
+	if self:IsIgnored(playerOrName) then
+		self:UnignorePlayer(playerOrName)
+		return false
+	else
+		self:IgnorePlayer(playerOrName)
+		return true
+	end
+end
+
+-- Convenience: clear all ignored players
+function Utils:ClearIgnoredPlayers()
+	table.clear(self.IgnoredPlayers)
+	local genv = self:GetGenEnv()
+	local config = genv.AimbotESP and genv.AimbotESP.Config
+	if config and config.aimbot and type(config.aimbot.ignoredPlayers) == "table" then
+		table.clear(config.aimbot.ignoredPlayers)
+	end
+end
+
+-- Convenience: get table of all currently blacklisted names/identifiers
+function Utils:GetIgnoredList()
+	local list = {}
+	for k, v in pairs(self.IgnoredPlayers) do
+		if v then
+			if typeof(k) == "Instance" and k:IsA("Player") then
+				list[k.Name] = true
+			elseif type(k) == "string" then
+				list[k] = true
+			end
+		end
+	end
+	return list
 end
 
 --[[------------------------------------------------------------------------------
@@ -1027,7 +1081,6 @@ function Utils:GetRigJoints(character)
 end
 
 return Utils
-
 end)()
 
 -- ==================== MODULE: Config ====================
@@ -1729,7 +1782,6 @@ function Config:GetSummary()
 end
 
 return Config
-
 end)()
 
 -- ==================== MODULE: AntiDetection ====================
@@ -2159,7 +2211,6 @@ function AntiDetection:Cleanup()
 end
 
 return AntiDetection
-
 end)()
 
 -- ==================== MODULE: Aimbot ====================
@@ -2893,7 +2944,6 @@ function Aimbot:Cleanup()
 end
 
 return Aimbot
-
 end)()
 
 -- ==================== MODULE: ESP ====================
@@ -3697,7 +3747,6 @@ function ESP:Cleanup()
 end
 
 return ESP
-
 end)()
 
 -- ==================== MODULE: GUI ====================
@@ -3767,6 +3816,7 @@ GUI.Elements = {
 	StatusDots = {},
 }
 GUI.KeybindConnections = {}
+GUI.BlacklistConnections = {}
 
 -- Theme palettes (WCAG AA compliant contrast tokens)
 GUI.Themes = {
@@ -3899,6 +3949,14 @@ function GUI:GetConfigComponent()
 	local genv = getGlobalEnv()
 	if genv.AimbotESP and genv.AimbotESP.Components and genv.AimbotESP.Components.Config then
 		return genv.AimbotESP.Components.Config
+	end
+	return nil
+end
+
+function GUI:GetUtilsComponent()
+	local genv = getGlobalEnv()
+	if genv.AimbotESP and genv.AimbotESP.Components and genv.AimbotESP.Components.Utils then
+		return genv.AimbotESP.Components.Utils
 	end
 	return nil
 end
@@ -4047,6 +4105,31 @@ local function createVectorIcon(iconType, parent, size, color)
 		})
 		createCorner(4, crest)
 		createStroke(color, 1.2, crest)
+	elseif iconType == "blacklist" or iconType == "users" then
+		local head = createInstance("Frame", {
+			Size = UDim2.fromOffset(6, 6),
+			Position = UDim2.new(0.5, -3, 0.08, 0),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Parent = container,
+		})
+		createCorner(6, head)
+		local body = createInstance("Frame", {
+			Size = UDim2.new(0.75, 0, 0.4, 0),
+			Position = UDim2.new(0.125, 0, 0.52, 0),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Parent = container,
+		})
+		createCorner(3, body)
+		local slash = createInstance("Frame", {
+			Size = UDim2.new(0.9, 0, 0, 1.5),
+			Position = UDim2.new(0.05, 0, 0.48, 0),
+			Rotation = 45,
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Parent = container,
+		})
 	elseif iconType == "settings" then
 		for i = 1, 3 do
 			local line = createInstance("Frame", {
@@ -4496,6 +4579,7 @@ function GUI:CreateTabs()
 		{ Id = "Aimbot", Name = "AimBot", Icon = "crosshair", Title = "AimBot & Trajectory Engine" },
 		{ Id = "TriggerBot", Name = "TriggerBot", Icon = "trigger", Title = "Universal TriggerBot Controls" },
 		{ Id = "Visuals", Name = "Visuals & ESP", Icon = "eye", Title = "ESP & Sensory Visualization" },
+		{ Id = "Blacklist", Name = "Blacklist", Icon = "blacklist", Title = "Player Blacklist & Ignore Manager" },
 		{ Id = "World", Name = "World & Visuals", Icon = "world", Title = "Environment, Themes & Colors" },
 		{ Id = "AntiCheat", Name = "Security & Stealth", Icon = "shield", Title = "Anti-Detection & Throttling" },
 		{ Id = "Settings", Name = "Settings & Profiles", Icon = "settings", Title = "Configuration Profiles & Hotkeys" },
@@ -4589,6 +4673,7 @@ function GUI:CreateTabs()
 	self:PopulateAimbotTab()
 	self:PopulateTriggerBotTab()
 	self:PopulateVisualsTab()
+	self:PopulateBlacklistTab()
 	self:PopulateWorldTab()
 	self:PopulateAntiCheatTab()
 	self:PopulateSettingsTab()
@@ -5312,6 +5397,16 @@ function GUI:PopulateAimbotTab()
 	self:CreateToggle(cardAcq, "Line-of-Sight Check", "Verifies raycast clearance before acquiring target", "aimbot.visibilityCheck")
 	self:CreateToggle(cardAcq, "Team Filter Check", "Ignores players assigned to local player team", "aimbot.teamCheck")
 	self:CreateToggle(cardAcq, "Target NPCs / Bots", "Acquires valid non-player humanoid characters", "aimbot.targetNPCs")
+	self:CreateActionButton(
+		cardAcq,
+		"Player Blacklist Filter",
+		"Pick specific server players to ignore completely across all systems",
+		"Open Blacklist",
+		"secondary",
+		function()
+			self:SwitchTab("Blacklist")
+		end
+	)
 
 	-- Card 3: Dynamics & Tracking
 	local cardDyn = self:CreateSectionCard(page, "Dynamics & Tracking", "Field-of-view limits, lerp smoothing, and trajectory prediction")
@@ -5369,6 +5464,490 @@ function GUI:PopulateVisualsTab()
 	self:CreateToggle(cardInfo, "Player Names & Tags", "Displays user handle and display names", "esp.names")
 	self:CreateToggle(cardInfo, "Distance Display", "Displays metric distance in studs", "esp.distance")
 	self:CreateToggle(cardInfo, "Equipped Weapon Display", "Displays currently equipped weapon name", "esp.weapons")
+end
+
+function GUI:PopulateBlacklistTab()
+	local page = self.Elements.TabPages["Blacklist"]
+	if not page then
+		return
+	end
+
+	local theme = self:GetActiveTheme()
+	local Players = game:GetService("Players")
+	local LocalPlayer = Players.LocalPlayer
+
+	-- Table mapping player -> row visual element references
+	local playerRows = {}
+	local currentFilterQuery = ""
+
+	-- Card 1: Live Player Pick List
+	local cardLive = self:CreateSectionCard(
+		page,
+		"Live Player Blacklist",
+		"Select players below to completely exclude them from AimBot, TriggerBot, and ESP"
+	)
+
+	-- Top Control Bar (Search, Refresh, Clear All)
+	local controlBar = createInstance("Frame", {
+		Name = "BlacklistControlBar",
+		Size = UDim2.new(1, 0, 0, 30),
+		BackgroundTransparency = 1,
+		Parent = cardLive,
+	})
+
+	-- Search Input Box
+	local searchBox = createInstance("TextBox", {
+		Name = "SearchBox",
+		Size = UDim2.new(0.48, 0, 1, 0),
+		Position = UDim2.fromScale(0, 0),
+		BackgroundColor3 = theme.ControlBg,
+		Text = "",
+		PlaceholderText = "Search server players...",
+		PlaceholderColor3 = theme.TextSecondary,
+		Font = Enum.Font.Gotham,
+		TextSize = 10,
+		TextColor3 = theme.Text,
+		ClearTextOnFocus = false,
+		Parent = controlBar,
+	})
+	createCorner(4, searchBox)
+	local searchStroke = createStroke(theme.CardBorder, 1, searchBox)
+	createPadding(0, 0, 8, 8, searchBox)
+	table.insert(self.Elements.ControlBackgrounds, searchBox)
+	table.insert(self.Elements.TextPrimary, searchBox)
+
+	-- Refresh Button
+	local refreshBtn = createInstance("TextButton", {
+		Name = "RefreshBtn",
+		Size = UDim2.new(0.24, -4, 1, 0),
+		Position = UDim2.new(0.50, 0, 0, 0),
+		BackgroundColor3 = theme.ControlBg,
+		Text = "Refresh",
+		Font = Enum.Font.GothamBold,
+		TextSize = 10,
+		TextColor3 = theme.TextSecondary,
+		AutoButtonColor = true,
+		Parent = controlBar,
+	})
+	createCorner(4, refreshBtn)
+	createStroke(theme.CardBorder, 1, refreshBtn)
+	table.insert(self.Elements.ControlBackgrounds, refreshBtn)
+	table.insert(self.Elements.TextSecondary, refreshBtn)
+
+	-- Clear All Button
+	local clearBtn = createInstance("TextButton", {
+		Name = "ClearBtn",
+		Size = UDim2.new(0.26, -4, 1, 0),
+		Position = UDim2.new(0.74, 4, 0, 0),
+		BackgroundColor3 = theme.ControlBg,
+		Text = "Clear All",
+		Font = Enum.Font.GothamBold,
+		TextSize = 10,
+		TextColor3 = theme.Danger,
+		AutoButtonColor = true,
+		Parent = controlBar,
+	})
+	createCorner(4, clearBtn)
+	createStroke(theme.CardBorder, 1, clearBtn)
+	table.insert(self.Elements.ControlBackgrounds, clearBtn)
+
+	-- Dynamic Status / Count Summary
+	local statusSummary = createInstance("TextLabel", {
+		Name = "StatusSummary",
+		Size = UDim2.new(1, 0, 0, 18),
+		BackgroundTransparency = 1,
+		Text = "Active Blacklisted Players: 0  |  Server Players: 0",
+		Font = Enum.Font.GothamMedium,
+		TextSize = 9,
+		TextColor3 = theme.Accent,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = cardLive,
+	})
+	table.insert(self.Elements.Accents, statusSummary)
+
+	-- Scrollable Player List Container
+	local listContainer = createInstance("ScrollingFrame", {
+		Name = "PlayerListContainer",
+		Size = UDim2.new(1, 0, 0, 220),
+		BackgroundColor3 = theme.Sidebar,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = theme.CardBorder,
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		Parent = cardLive,
+	})
+	createCorner(6, listContainer)
+	createStroke(theme.CardBorder, 1, listContainer)
+	createPadding(6, 6, 6, 6, listContainer)
+	local listLayout = Instance.new("UIListLayout", listContainer)
+	listLayout.Padding = UDim.new(0, 4)
+	listLayout.SortOrder = Enum.SortOrder.Name
+	table.insert(self.Elements.ControlBorders, listContainer)
+
+	-- Empty State Label
+	local emptyLabel = createInstance("TextLabel", {
+		Name = "EmptyLabel",
+		Size = UDim2.new(1, 0, 0, 36),
+		BackgroundTransparency = 1,
+		Text = "No other players found in this server.",
+		Font = Enum.Font.Gotham,
+		TextSize = 10,
+		TextColor3 = theme.TextSecondary,
+		Visible = false,
+		Parent = listContainer,
+	})
+	table.insert(self.Elements.TextSecondary, emptyLabel)
+
+	-- Forward references
+	local rebuildList = nil
+
+	-- Update summary label counts
+	local function updateSummary()
+		local curTheme = self:GetActiveTheme()
+		local activePlayers = Players:GetPlayers()
+		local totalCount = 0
+		local blacklistedCount = 0
+		local u = self:GetUtilsComponent()
+
+		for _, p in ipairs(activePlayers) do
+			if p ~= LocalPlayer then
+				totalCount = totalCount + 1
+				if u and u:IsIgnored(p) then
+					blacklistedCount = blacklistedCount + 1
+				end
+			end
+		end
+
+		statusSummary.Text = string.format("Blacklisted: %d  |  Server Players: %d", blacklistedCount, totalCount)
+		statusSummary.TextColor3 = curTheme.Accent
+	end
+
+	-- Apply search query filtering
+	local function applyFilter(query)
+		currentFilterQuery = string.lower(query or "")
+		local visibleCount = 0
+		for player, rowData in pairs(playerRows) do
+			if rowData and rowData.Frame then
+				local dName = string.lower(player.DisplayName or "")
+				local uName = string.lower(player.Name or "")
+				if currentFilterQuery == "" or string.find(dName, currentFilterQuery, 1, true) or string.find(uName, currentFilterQuery, 1, true) then
+					rowData.Frame.Visible = true
+					visibleCount = visibleCount + 1
+				else
+					rowData.Frame.Visible = false
+				end
+			end
+		end
+		emptyLabel.Visible = (visibleCount == 0)
+		if visibleCount == 0 and currentFilterQuery ~= "" then
+			emptyLabel.Text = "No players match '" .. currentFilterQuery .. "'"
+		else
+			emptyLabel.Text = "No other players found in this server."
+		end
+	end
+
+	searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+		applyFilter(searchBox.Text)
+	end)
+
+	-- Construct an individual player row
+	local function createPlayerRow(player)
+		local curTheme = self:GetActiveTheme()
+		local u = self:GetUtilsComponent()
+		local isIgnored = u and u:IsIgnored(player) or false
+
+		local row = createInstance("Frame", {
+			Name = player.Name,
+			Size = UDim2.new(1, 0, 0, 36),
+			BackgroundColor3 = isIgnored and Color3.fromRGB(36, 22, 26) or curTheme.ControlBg,
+			BorderSizePixel = 0,
+			Parent = listContainer,
+		})
+		createCorner(4, row)
+		local rowStroke = createStroke(isIgnored and curTheme.Danger or curTheme.CardBorder, 1, row)
+
+		-- Avatar Headshot Thumbnail
+		local avatar = createInstance("ImageLabel", {
+			Name = "Avatar",
+			Size = UDim2.fromOffset(26, 26),
+			Position = UDim2.new(0, 5, 0.5, -13),
+			BackgroundColor3 = curTheme.Sidebar,
+			BackgroundTransparency = 0,
+			Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(player.UserId) .. "&w=48&h=48",
+			Parent = row,
+		})
+		createCorner(13, avatar)
+
+		-- Info Container (DisplayName, @Username, Team)
+		local infoBox = createInstance("Frame", {
+			Name = "InfoBox",
+			Size = UDim2.new(1, -195, 1, 0),
+			Position = UDim2.new(0, 36, 0, 0),
+			BackgroundTransparency = 1,
+			Parent = row,
+		})
+
+		local nameLabel = createInstance("TextLabel", {
+			Name = "DisplayName",
+			Size = UDim2.new(1, 0, 0, 16),
+			Position = UDim2.new(0, 0, 0, 3),
+			BackgroundTransparency = 1,
+			Text = player.DisplayName,
+			Font = Enum.Font.GothamMedium,
+			TextSize = 11,
+			TextColor3 = isIgnored and curTheme.Danger or curTheme.Text,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Parent = infoBox,
+		})
+
+		local userTagText = "@" .. player.Name
+		if player.Team then
+			userTagText = userTagText .. " [" .. player.Team.Name .. "]"
+		end
+
+		local tagLabel = createInstance("TextLabel", {
+			Name = "UserTag",
+			Size = UDim2.new(1, 0, 0, 14),
+			Position = UDim2.new(0, 0, 0, 18),
+			BackgroundTransparency = 1,
+			Text = userTagText,
+			Font = Enum.Font.Gotham,
+			TextSize = 9,
+			TextColor3 = player.Team and player.TeamColor.Color or curTheme.TextSecondary,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Parent = infoBox,
+		})
+
+		-- Status Pill Badge
+		local statusBadge = createInstance("Frame", {
+			Name = "StatusBadge",
+			Size = UDim2.fromOffset(72, 20),
+			Position = UDim2.new(1, -152, 0.5, -10),
+			BackgroundColor3 = isIgnored and curTheme.Danger or curTheme.CardBorder,
+			BackgroundTransparency = isIgnored and 0.15 or 0.5,
+			Parent = row,
+		})
+		createCorner(4, statusBadge)
+
+		local statusText = createInstance("TextLabel", {
+			Name = "StatusText",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			Text = isIgnored and "IGNORED" or "ACTIVE",
+			Font = Enum.Font.GothamBold,
+			TextSize = 8,
+			TextColor3 = isIgnored and Color3.fromRGB(255, 255, 255) or curTheme.TextSecondary,
+			Parent = statusBadge,
+		})
+
+		-- Toggle Button (Blacklist / Unignore)
+		local actionBtn = createInstance("TextButton", {
+			Name = "ToggleBtn",
+			Size = UDim2.fromOffset(70, 24),
+			Position = UDim2.new(1, -76, 0.5, -12),
+			BackgroundColor3 = isIgnored and curTheme.Accent or Color3.fromRGB(180, 45, 45),
+			Text = isIgnored and "Unignore" or "Blacklist",
+			Font = Enum.Font.GothamBold,
+			TextSize = 10,
+			TextColor3 = Color3.fromRGB(255, 255, 255),
+			AutoButtonColor = true,
+			Parent = row,
+		})
+		createCorner(4, actionBtn)
+
+		-- Click Toggle Handler
+		actionBtn.MouseButton1Click:Connect(function()
+			local currentUtils = self:GetUtilsComponent()
+			if not currentUtils then
+				return
+			end
+
+			local newState = currentUtils:ToggleIgnoredPlayer(player)
+			local latestTheme = self:GetActiveTheme()
+
+			if newState then
+				self:ShowToast("Blacklisted " .. player.DisplayName .. " (@" .. player.Name .. ")", "warning")
+			else
+				self:ShowToast("Unignored " .. player.DisplayName .. " (@" .. player.Name .. ")", "success")
+			end
+
+			-- Update row visuals dynamically
+			row.BackgroundColor3 = newState and Color3.fromRGB(36, 22, 26) or latestTheme.ControlBg
+			rowStroke.Color = newState and latestTheme.Danger or latestTheme.CardBorder
+			nameLabel.TextColor3 = newState and latestTheme.Danger or latestTheme.Text
+
+			statusBadge.BackgroundColor3 = newState and latestTheme.Danger or latestTheme.CardBorder
+			statusBadge.BackgroundTransparency = newState and 0.15 or 0.5
+			statusText.Text = newState and "IGNORED" or "ACTIVE"
+			statusText.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or latestTheme.TextSecondary
+
+			actionBtn.Text = newState and "Unignore" or "Blacklist"
+			actionBtn.BackgroundColor3 = newState and latestTheme.Accent or Color3.fromRGB(180, 45, 45)
+
+			updateSummary()
+		end)
+
+		playerRows[player] = {
+			Frame = row,
+			ActionBtn = actionBtn,
+			StatusText = statusText,
+			StatusBadge = statusBadge,
+		}
+
+		return row
+	end
+
+	-- Rebuild all player rows
+	rebuildList = function()
+		for _, rowData in pairs(playerRows) do
+			if rowData and rowData.Frame then
+				rowData.Frame:Destroy()
+			end
+		end
+		playerRows = {}
+
+		local currentPlayers = Players:GetPlayers()
+		local otherCount = 0
+
+		for _, p in ipairs(currentPlayers) do
+			if p ~= LocalPlayer then
+				otherCount = otherCount + 1
+				createPlayerRow(p)
+			end
+		end
+
+		emptyLabel.Visible = (otherCount == 0)
+		applyFilter(searchBox.Text)
+		updateSummary()
+	end
+
+	-- Connect Refresh Button
+	refreshBtn.MouseButton1Click:Connect(function()
+		rebuildList()
+		self:ShowToast("Refreshed server player list", "info")
+	end)
+
+	-- Connect Clear Button
+	clearBtn.MouseButton1Click:Connect(function()
+		local u = self:GetUtilsComponent()
+		if u then
+			u:ClearIgnoredPlayers()
+			self:ShowToast("All player blacklists cleared", "warning")
+			rebuildList()
+		end
+	end)
+
+	-- Card 2: Manual Username Blacklist (for offline or custom targets)
+	local cardManual = self:CreateSectionCard(
+		page,
+		"Manual Username Blacklist",
+		"Blacklist players by exact username even if they are not in this server"
+	)
+
+	local manualInputRow = createInstance("Frame", {
+		Name = "ManualInputRow",
+		Size = UDim2.new(1, 0, 0, 28),
+		BackgroundTransparency = 1,
+		Parent = cardManual,
+	})
+
+	local manualBox = createInstance("TextBox", {
+		Name = "ManualBox",
+		Size = UDim2.new(0.64, 0, 1, 0),
+		BackgroundColor3 = theme.ControlBg,
+		Text = "",
+		PlaceholderText = "Enter player username...",
+		PlaceholderColor3 = theme.TextSecondary,
+		Font = Enum.Font.Gotham,
+		TextSize = 10,
+		TextColor3 = theme.Text,
+		ClearTextOnFocus = false,
+		Parent = manualInputRow,
+	})
+	createCorner(4, manualBox)
+	createStroke(theme.CardBorder, 1, manualBox)
+	createPadding(0, 0, 8, 8, manualBox)
+	table.insert(self.Elements.ControlBackgrounds, manualBox)
+	table.insert(self.Elements.TextPrimary, manualBox)
+
+	local addManualBtn = createInstance("TextButton", {
+		Name = "AddManualBtn",
+		Size = UDim2.new(0.34, 0, 1, 0),
+		Position = UDim2.new(0.66, 0, 0, 0),
+		BackgroundColor3 = theme.Accent,
+		Text = "Add to Blacklist",
+		Font = Enum.Font.GothamBold,
+		TextSize = 10,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		AutoButtonColor = true,
+		Parent = manualInputRow,
+	})
+	createCorner(4, addManualBtn)
+	table.insert(self.Elements.Accents, addManualBtn)
+
+	addManualBtn.MouseButton1Click:Connect(function()
+		local input = manualBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
+		if #input > 0 then
+			local u = self:GetUtilsComponent()
+			if u then
+				u:IgnorePlayer(input)
+				self:ShowToast("Added @" .. input .. " to blacklist", "warning")
+				manualBox.Text = ""
+				rebuildList()
+			end
+		else
+			self:ShowToast("Please enter a valid player username", "warning")
+		end
+	end)
+
+	-- Card 3: Bulk Actions & System Impact
+	local cardBulk = self:CreateSectionCard(
+		page,
+		"Bulk Actions & Filter Scope",
+		"Bulk operations and real-time protection coverage"
+	)
+
+	self:CreateActionButton(
+		cardBulk,
+		"Blacklist All Other Players",
+		"Instantly ignores every other player currently connected to this server",
+		"Ignore All",
+		"danger",
+		function()
+			local u = self:GetUtilsComponent()
+			if u then
+				local count = 0
+				for _, p in ipairs(Players:GetPlayers()) do
+					if p ~= LocalPlayer then
+						u:IgnorePlayer(p)
+						u:IgnorePlayer(p.Name)
+						count = count + 1
+					end
+				end
+				self:ShowToast(string.format("Blacklisted %d server players", count), "warning")
+				rebuildList()
+			end
+		end
+	)
+
+	-- Initial build
+	rebuildList()
+
+	-- Dynamic connections for real-time player joins and leaves
+	self.BlacklistConnections = self.BlacklistConnections or {}
+	local addConn = Players.PlayerAdded:Connect(function()
+		task.wait(0.2)
+		rebuildList()
+	end)
+	local remConn = Players.PlayerRemoving:Connect(function()
+		task.wait(0.1)
+		rebuildList()
+	end)
+	table.insert(self.BlacklistConnections, addConn)
+	table.insert(self.BlacklistConnections, remConn)
 end
 
 function GUI:PopulateWorldTab()
@@ -5937,6 +6516,15 @@ function GUI:Cleanup()
 	end
 	self.KeybindConnections = {}
 
+	if self.BlacklistConnections then
+		for _, conn in ipairs(self.BlacklistConnections) do
+			pcall(function()
+				conn:Disconnect()
+			end)
+		end
+		self.BlacklistConnections = {}
+	end
+
 	if self.ScreenGui then
 		self.ScreenGui:Destroy()
 		self.ScreenGui = nil
@@ -5967,7 +6555,6 @@ function GUI:Cleanup()
 end
 
 return GUI
-
 end)()
 
 local function loadModule(name, fileName)
