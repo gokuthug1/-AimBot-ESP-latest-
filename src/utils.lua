@@ -16,6 +16,10 @@
 ]]
 
 local Utils = {}
+-- Green-outline team filter: players detected as friendly via a green outline
+-- Keys are Player objects, values are true
+Utils.GreenTeamFilter = {}
+
 
 -- Services
 local Players = game:GetService("Players")
@@ -338,6 +342,10 @@ function Utils:IsTeammate(player)
 	if player == LocalPlayer then
 		return true
 	end
+	-- Players detected as having a green outline are treated as teammates
+	if self.GreenTeamFilter[player] then
+		return true
+	end
 	if LocalPlayer.Team ~= nil and player.Team ~= nil then
 		return LocalPlayer.Team == player.Team
 	end
@@ -425,6 +433,125 @@ function Utils:IsPlayerVisible(player, fromPosition)
 	return self:IsPartVisible(root, character)
 end
 
+
+--[[------------------------------------------------------------------------------
+    Green Outline Team Filter Detection
+    Scans all players' characters for green-colored Highlights, SelectionBoxes,
+    BillboardGuis, UIStrokes, or BasePart colors that indicate a friendly team.
+    Dead players are always ignored.
+--------------------------------------------------------------------------------]]
+
+-- Returns true if a Color3 is considered "green" (covers all common green shades)
+function Utils:IsGreenColor(color)
+	if typeof(color) ~= "Color3" then
+		return false
+	end
+	local h, s, v = Color3.toHSV(color)
+	-- Hue range for green: roughly 85°-165° (normalized 0-1: ~0.236 to 0.458)
+	-- Require meaningful saturation and brightness so near-white/grey isn't caught
+	return h >= 0.236 and h <= 0.458 and s >= 0.25 and v >= 0.15
+end
+
+-- Scans every non-local player's character for green outlines/highlights.
+-- Alive players with a green indicator are added to GreenTeamFilter;
+-- dead players are removed from the filter (cleaned up automatically).
+function Utils:ScanGreenOutlinePlayers()
+	local localPlayer = LocalPlayer
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player == localPlayer then
+			continue
+		end
+
+		-- Remove dead / disconnected players from the filter
+		if not self:IsPlayerAlive(player) then
+			self.GreenTeamFilter[player] = nil
+			continue
+		end
+
+		local character = player.Character
+		if not character then
+			continue
+		end
+
+		local foundGreen = false
+
+		-- Check Highlight instances (modern Roblox chams/selection)
+		for _, inst in ipairs(character:GetDescendants()) do
+			if foundGreen then break end
+
+			-- Highlight (FillColor / OutlineColor)
+			if inst:IsA("Highlight") then
+				if self:IsGreenColor(inst.OutlineColor) or self:IsGreenColor(inst.FillColor) then
+					foundGreen = true
+					break
+				end
+			end
+
+			-- SelectionBox (Color / LineThickness color)
+			if inst:IsA("SelectionBox") then
+				if self:IsGreenColor(inst.Color3) or self:IsGreenColor(inst.SurfaceColor3) then
+					foundGreen = true
+					break
+				end
+			end
+
+			-- UIStroke inside BillboardGuis / SurfaceGuis
+			if inst:IsA("UIStroke") then
+				if self:IsGreenColor(inst.Color) then
+					foundGreen = true
+					break
+				end
+			end
+
+			-- BillboardGui TextLabel / ImageLabel children colored green
+			if inst:IsA("TextLabel") or inst:IsA("ImageLabel") or inst:IsA("Frame") then
+				if self:IsGreenColor(inst.BackgroundColor3) then
+					foundGreen = true
+					break
+				end
+				if inst:IsA("TextLabel") and self:IsGreenColor(inst.TextColor3) then
+					foundGreen = true
+					break
+				end
+				if inst:IsA("ImageLabel") and self:IsGreenColor(inst.ImageColor3) then
+					foundGreen = true
+					break
+				end
+			end
+
+			-- BasePart with a green color (game-specific colored outlines via material/part)
+			if inst:IsA("BasePart") then
+				if self:IsGreenColor(inst.Color) then
+					foundGreen = true
+					break
+				end
+			end
+		end
+
+		-- Also scan for SelectionBox objects in Workspace targeting this character
+		if not foundGreen then
+			for _, inst in ipairs(Workspace:GetDescendants()) do
+				if foundGreen then break end
+				if inst:IsA("SelectionBox") then
+					local adornee = inst.Adornee
+					if adornee and (adornee == character or (adornee:IsA("Instance") and adornee:IsDescendantOf(character))) then
+						if self:IsGreenColor(inst.Color3) or self:IsGreenColor(inst.SurfaceColor3) then
+							foundGreen = true
+						end
+					end
+				end
+			end
+		end
+
+		if foundGreen then
+			self.GreenTeamFilter[player] = true
+		else
+			-- Only clear if they weren't already in the filter from before
+			-- (keeps the filter sticky until player respawns fresh without green)
+			self.GreenTeamFilter[player] = nil
+		end
+	end
+end
 --[[------------------------------------------------------------------------------
     Target Filtering & Prioritization
 --------------------------------------------------------------------------------]]
@@ -450,6 +577,10 @@ function Utils:GetValidTargets(options)
 	-- 1. Gather Players
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer and self:IsPlayerAlive(player) then
+			-- Always skip players detected as green-outlined teammates (dead players auto-purged by scan)
+			if self.GreenTeamFilter[player] then
+				continue
+			end
 			if not (teamCheck and self:IsTeammate(player)) then
 				local character = player.Character
 				local root = self:GetTargetRootPart(character)

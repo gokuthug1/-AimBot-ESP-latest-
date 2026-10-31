@@ -224,9 +224,22 @@ genv.AimbotESP.State.ESPEnabled = Config:Get("esp.enabled") or false
     Primary Execution Loop (RenderStepped & Heartbeat)
 --------------------------------------------------------------------------------]]
 
+-- Counter to throttle the green-outline scan (runs every ~15 frames to reduce cost)
+local _greenScanCounter = 0
+
 local renderConn = RunService.RenderStepped:Connect(function()
 	if genv.AimbotESP.State.EmergencyDisabled then
 		return
+	end
+
+	-- Throttled green-outline scan (every 15 render steps ~4x per sec at 60fps)
+	_greenScanCounter = _greenScanCounter + 1
+	if _greenScanCounter >= 15 then
+		_greenScanCounter = 0
+		local utils = genv.AimbotESP.Components.Utils
+		if utils then
+			pcall(function() utils:ScanGreenOutlinePlayers() end)
+		end
 	end
 
 	if Aimbot then
