@@ -184,6 +184,19 @@ function ESP:CreatePlayerESP(player)
 	espData.elements.boxOutline = boxOutline
 	espData.elements.boxStroke = boxStroke
 
+	-- Corner box bracket lines (8 segments: 2 per corner)
+	local cornerLines = {}
+	for i = 1, 8 do
+		local cLine = Instance.new("Frame")
+		cLine.Name = "Corner_" .. i
+		cLine.BorderSizePixel = 0
+		cLine.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+		cLine.Visible = false
+		cLine.Parent = holder
+		table.insert(cornerLines, cLine)
+	end
+	espData.elements.cornerLines = cornerLines
+
 	-- Name label
 	local nameLabel = Instance.new("TextLabel")
 	nameLabel.Name = "NameLabel"
@@ -305,6 +318,14 @@ function ESP:CreatePlayerESP(player)
 	end
 	espData.elements.skeleton = skeletonLines
 
+	-- Automatically track character respawns
+	if typeof(player) == "Instance" and player:IsA("Player") then
+		local charConn = player.CharacterAdded:Connect(function(newChar)
+			espData.character = newChar
+		end)
+		table.insert(espData.connections, charConn)
+	end
+
 	self.PlayerESP[player] = espData
 	return espData
 end
@@ -355,6 +376,12 @@ function ESP:GetTargetColor(character, isTeammate)
 		return config.occludedColor or Color3.fromRGB(120, 120, 120)
 	end
 
+	-- If player is detected as a green-outlined teammate, preserve green visual styling
+	local player = Players:GetPlayerFromCharacter(character)
+	if utils and player and utils.GreenTeamFilter and utils.GreenTeamFilter[player] then
+		return self.ColorPresets.Green or Color3.fromRGB(60, 255, 60)
+	end
+
 	if isTeammate then
 		local preset = config.teamColor or "Blue"
 		return self.ColorPresets[preset] or Color3.fromRGB(60, 140, 255)
@@ -371,6 +398,16 @@ function ESP:UpdatePlayerESP(player, espData)
 	local genv = getGlobalEnv()
 
 	local isEmergency = genv.AimbotESP and genv.AimbotESP.State and genv.AimbotESP.State.EmergencyDisabled
+	-- Hide ESP completely for explicitly ignored players
+	if utils and utils:IsIgnored(player) then
+		espData.elements.mainFrame.Visible = false
+		espData.elements.tracerLine.Visible = false
+		espData.elements.headDot.Visible = false
+		for _, line in ipairs(espData.elements.skeleton or {}) do
+			line.Visible = false
+		end
+		return
+	end
 	if not config.enabled or isEmergency or not utils or not utils:IsPlayerAlive(player) then
 		espData.elements.mainFrame.Visible = false
 		espData.elements.tracerLine.Visible = false
@@ -437,9 +474,58 @@ function ESP:UpdatePlayerESP(player, espData)
 	espData.elements.mainFrame.Size = UDim2.fromOffset(bSize.X, bSize.Y)
 	espData.elements.mainFrame.Visible = true
 
-	espData.elements.boxOutline.Visible = (config.boxes ~= false)
-	espData.elements.boxStroke.Color = targetColor
-	espData.elements.boxStroke.Thickness = config.thickness or 1.5
+	local showBoxes = (config.boxes ~= false)
+	local isCorner = (config.boxType == "Corner")
+
+	if showBoxes and isCorner then
+		espData.elements.boxOutline.Visible = false
+		local thick = config.thickness or 1.5
+		local cLen = math.clamp(math.min(bSize.X, bSize.Y) * 0.25, 4, 18)
+		local lines = espData.elements.cornerLines or {}
+
+		if #lines >= 8 then
+			-- Top-Left
+			lines[1].Position = UDim2.fromOffset(0, 0)
+			lines[1].Size = UDim2.fromOffset(cLen, thick)
+			lines[2].Position = UDim2.fromOffset(0, 0)
+			lines[2].Size = UDim2.fromOffset(thick, cLen)
+
+			-- Top-Right
+			lines[3].Position = UDim2.fromOffset(bSize.X - cLen, 0)
+			lines[3].Size = UDim2.fromOffset(cLen, thick)
+			lines[4].Position = UDim2.fromOffset(bSize.X - thick, 0)
+			lines[4].Size = UDim2.fromOffset(thick, cLen)
+
+			-- Bottom-Left
+			lines[5].Position = UDim2.fromOffset(0, bSize.Y - thick)
+			lines[5].Size = UDim2.fromOffset(cLen, thick)
+			lines[6].Position = UDim2.fromOffset(0, bSize.Y - cLen)
+			lines[6].Size = UDim2.fromOffset(thick, cLen)
+
+			-- Bottom-Right
+			lines[7].Position = UDim2.fromOffset(bSize.X - cLen, bSize.Y - thick)
+			lines[7].Size = UDim2.fromOffset(cLen, thick)
+			lines[8].Position = UDim2.fromOffset(bSize.X - thick, bSize.Y - cLen)
+			lines[8].Size = UDim2.fromOffset(thick, cLen)
+
+			for _, l in ipairs(lines) do
+				l.BackgroundColor3 = targetColor
+				l.Visible = true
+			end
+		end
+	elseif showBoxes then
+		espData.elements.boxOutline.Visible = true
+		espData.elements.boxStroke.Color = targetColor
+		espData.elements.boxStroke.Thickness = config.thickness or 1.5
+		for _, l in ipairs(espData.elements.cornerLines or {}) do
+			l.Visible = false
+		end
+	else
+		espData.elements.boxOutline.Visible = false
+		for _, l in ipairs(espData.elements.cornerLines or {}) do
+			l.Visible = false
+		end
+	end
 
 	-- Update Name Label
 	espData.elements.nameLabel.Visible = (config.names ~= false)

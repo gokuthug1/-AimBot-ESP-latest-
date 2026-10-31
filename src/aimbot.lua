@@ -179,11 +179,16 @@ function Aimbot:UpdateFOVCircle()
 	end
 	local viewportSize = Camera and Camera.ViewportSize or Vector2.new(1920, 1080)
 	local center = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
+	local isLockCenter = UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter
 
-	-- In unlocked mouse mode, center circle around mouse cursor
-	if UserInputService.MouseBehavior ~= Enum.MouseBehavior.LockCenter then
+	local drawingCenter = center
+	local guiCenter = center
+
+	if not isLockCenter then
 		local mousePos = UserInputService:GetMouseLocation()
-		center = mousePos
+		local inset = utils and utils:GetGuiInset() or Vector2.zero
+		drawingCenter = mousePos
+		guiCenter = Vector2.new(mousePos.X - inset.X, mousePos.Y - inset.Y)
 	end
 
 	local fov = config.fov or 120
@@ -193,7 +198,7 @@ function Aimbot:UpdateFOVCircle()
 	if self.FOVDrawing then
 		self.FOVDrawing.Visible = isVisible
 		if isVisible then
-			self.FOVDrawing.Position = center
+			self.FOVDrawing.Position = drawingCenter
 			self.FOVDrawing.Radius = fovRadius
 		end
 	end
@@ -203,7 +208,7 @@ function Aimbot:UpdateFOVCircle()
 		self.FOVCircle.Visible = isVisible
 		if isVisible then
 			self.FOVCircle.Size = UDim2.fromOffset(fovRadius * 2, fovRadius * 2)
-			self.FOVCircle.Position = UDim2.fromOffset(center.X, center.Y)
+			self.FOVCircle.Position = UDim2.fromOffset(guiCenter.X, guiCenter.Y)
 		end
 	end
 end
@@ -299,7 +304,9 @@ function Aimbot:IsInFOV(targetPosition)
 	local center = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
 
 	if UserInputService.MouseBehavior ~= Enum.MouseBehavior.LockCenter then
-		center = UserInputService:GetMouseLocation()
+		local mousePos = UserInputService:GetMouseLocation()
+		local inset = utils:GetGuiInset()
+		center = Vector2.new(mousePos.X - inset.X, mousePos.Y - inset.Y)
 	end
 
 	local distance = (screenPos - center).Magnitude
@@ -313,7 +320,22 @@ function Aimbot:PredictTargetPosition(targetPart, targetVelocity)
 		return targetPart.Position
 	end
 
-	local predictionTime = config.predictionTime or 0.1
+	local predictionTime = config.predictionTime
+	if not predictionTime or predictionTime <= 0 then
+		-- Dynamic ping compensation from native network stats
+		local ping = 0.05
+		pcall(function()
+			local netStats = game:GetService("Stats"):FindFirstChild("Network")
+			if netStats and netStats:FindFirstChild("ServerStatsItem") then
+				local pingItem = netStats.ServerStatsItem:FindFirstChild("Data Ping")
+				if pingItem then
+					ping = pingItem:GetValue() / 1000
+				end
+			end
+		end)
+		predictionTime = math.clamp(ping + 0.03, 0.03, 0.25)
+	end
+
 	return targetPart.Position + (targetVelocity * predictionTime)
 end
 
@@ -333,7 +355,10 @@ function Aimbot:FindBestTarget()
 		return nil
 	end
 
-	-- AimLock: keep lock on existing target if valid
+	-- AimLock: keep lock on existing target if valid (clear lock if target is now ignored)
+	if self.LockedTarget and (utils:IsIgnored(self.LockedTarget.player) or utils:IsIgnored(self.LockedTarget.character)) then
+		self.LockedTarget = nil
+	end
 	if config.aimLock and self.LockedTarget and utils:IsTargetAlive(self.LockedTarget.character) then
 		local targetPart = self:GetTargetPart(self.LockedTarget.character, config.targetPart)
 		if targetPart then
@@ -506,14 +531,16 @@ function Aimbot:UpdateTriggerBot()
 		return
 	end
 
-	-- Determine crosshair ray
-	local rayX, rayY = Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2
-	if UserInputService.MouseBehavior ~= Enum.MouseBehavior.LockCenter then
-		local mousePos = UserInputService:GetMouseLocation()
-		rayX, rayY = mousePos.X, mousePos.Y
-	end
+	-- Determine crosshair ray with pixel-perfect viewport/screen mapping
+	local isLockCenter = UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter
+	local unitRay = nil
 
-	local unitRay = Camera:ViewportPointToRay(rayX, rayY)
+	if not isLockCenter then
+		local mousePos = UserInputService:GetMouseLocation()
+		unitRay = Camera:ScreenPointToRay(mousePos.X, mousePos.Y)
+	else
+		unitRay = Camera:ViewportPointToRay(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	end
 	local rayParams = RaycastParams.new()
 	local filterType = Enum.RaycastFilterType.Exclude
 	if not filterType then
@@ -544,6 +571,10 @@ function Aimbot:UpdateTriggerBot()
 		if model and utils and utils:IsTargetAlive(model) then
 			local isValidTarget = false
 			local targetPlayer = Players:GetPlayerFromCharacter(model)
+			-- Skip ignored players
+			if (targetPlayer and utils:IsIgnored(targetPlayer)) or utils:IsIgnored(model) then
+				return
+			end
 
 			if targetPlayer and targetPlayer ~= LocalPlayer then
 				if not (trigConfig.teamCheck and utils:IsTeammate(targetPlayer)) then

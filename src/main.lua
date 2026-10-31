@@ -166,6 +166,12 @@ if not Utils then
 end
 genv.AimbotESP.Components.Utils = Utils
 
+-- Expose the player ignore filter on the global namespace for easy runtime access
+-- Usage: genv.AimbotESP.IgnoredPlayers["PlayerName"] = true  /  false
+-- Or via helpers: genv.AimbotESP.Components.Utils:IgnorePlayer(player)
+--                 genv.AimbotESP.Components.Utils:UnignorePlayer(player)
+genv.AimbotESP.IgnoredPlayers = Utils.IgnoredPlayers  -- shared reference
+
 -- 2. Load Config
 local Config = loadModule("Config", "config.lua")
 if not Config then

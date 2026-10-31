@@ -20,6 +20,12 @@ local Utils = {}
 -- Keys are Player objects, values are true
 Utils.GreenTeamFilter = {}
 
+-- Player ignore filter: add a player object or their name (string) to block them
+-- from ALL systems (aimbot, triggerbot, ESP). Persists until manually removed.
+-- Usage:  Utils.IgnoredPlayers[player] = true   (by object)
+--         Utils.IgnoredPlayers["PlayerName"]   = true   (by name, survives respawn)
+Utils.IgnoredPlayers = {}
+
 
 -- Services
 local Players = game:GetService("Players")
@@ -312,6 +318,13 @@ function Utils:IsTargetAlive(character)
 	if not humanoid or humanoid.Health <= 0 then
 		return false
 	end
+	local isDead = false
+	pcall(function()
+		isDead = (humanoid:GetState() == Enum.HumanoidStateType.Dead)
+	end)
+	if isDead then
+		return false
+	end
 	local root = self:GetTargetRootPart(character)
 	return root ~= nil
 end
@@ -441,28 +454,42 @@ end
     Dead players are always ignored.
 --------------------------------------------------------------------------------]]
 
--- Returns true if a Color3 is considered "green" (covers all common green shades)
+-- Returns true if a Color3 is considered "green" (supports ALL shades: lime, neon, olive, forest, mint, pastel)
 function Utils:IsGreenColor(color)
 	if typeof(color) ~= "Color3" then
 		return false
 	end
+
+	-- 1. Wide HSV green range (approx 72Â° to 170Â°)
 	local h, s, v = Color3.toHSV(color)
-	-- Hue range for green: roughly 85°-165° (normalized 0-1: ~0.236 to 0.458)
-	-- Require meaningful saturation and brightness so near-white/grey isn't caught
-	return h >= 0.236 and h <= 0.458 and s >= 0.25 and v >= 0.15
+	if h >= 0.20 and h <= 0.472 and s >= 0.15 and v >= 0.10 then
+		return true
+	end
+
+	-- 2. Direct RGB green-dominance check (catches custom tints, pastel green, dark forest green)
+	if color.G > 0.12 and (color.G > color.R * 1.12) and (color.G > color.B * 1.12) then
+		return true
+	end
+
+	return false
 end
 
--- Scans every non-local player's character for green outlines/highlights.
--- Alive players with a green indicator are added to GreenTeamFilter;
--- dead players are removed from the filter (cleaned up automatically).
+-- Scans all players' characters for active green outlines, highlights, or selection visuals.
+-- Uses a high-performance two-tier scan:
+--   Tier 1: Character descendants check (<0.05ms per player)
+--   Tier 2: Single-pass Workspace sweep only if external adornees are unresolved
+-- Dead players are strictly ignored and immediately purged from GreenTeamFilter.
 function Utils:ScanGreenOutlinePlayers()
 	local localPlayer = LocalPlayer
-	for _, player in ipairs(Players:GetPlayers()) do
+	local players = Players:GetPlayers()
+	local unconfirmed = {}
+
+	for _, player in ipairs(players) do
 		if player == localPlayer then
 			continue
 		end
 
-		-- Remove dead / disconnected players from the filter
+		-- Strictly ignore dead or disconnected players
 		if not self:IsPlayerAlive(player) then
 			self.GreenTeamFilter[player] = nil
 			continue
@@ -470,81 +497,55 @@ function Utils:ScanGreenOutlinePlayers()
 
 		local character = player.Character
 		if not character then
+			self.GreenTeamFilter[player] = nil
 			continue
 		end
 
 		local foundGreen = false
 
-		-- Check Highlight instances (modern Roblox chams/selection)
+		-- Tier 1: Fast scan through character descendants
 		for _, inst in ipairs(character:GetDescendants()) do
-			if foundGreen then break end
-
-			-- Highlight (FillColor / OutlineColor)
+			-- Highlight (OutlineColor / FillColor with active visibility check)
 			if inst:IsA("Highlight") then
-				if self:IsGreenColor(inst.OutlineColor) or self:IsGreenColor(inst.FillColor) then
+				local isVisible = (inst.Enabled ~= false) and (inst.OutlineTransparency < 1 or inst.FillTransparency < 1)
+				if isVisible and (self:IsGreenColor(inst.OutlineColor) or self:IsGreenColor(inst.FillColor)) then
 					foundGreen = true
 					break
 				end
-			end
-
-			-- SelectionBox (Color / LineThickness color)
-			if inst:IsA("SelectionBox") then
-				if self:IsGreenColor(inst.Color3) or self:IsGreenColor(inst.SurfaceColor3) then
+			-- SelectionBox
+			elseif inst:IsA("SelectionBox") then
+				local isVisible = (inst.Visible ~= false) and (inst.Transparency < 1)
+				if isVisible and (self:IsGreenColor(inst.Color3) or self:IsGreenColor(inst.SurfaceColor3)) then
 					foundGreen = true
 					break
 				end
-			end
-
 			-- UIStroke inside BillboardGuis / SurfaceGuis
-			if inst:IsA("UIStroke") then
-				if self:IsGreenColor(inst.Color) then
+			elseif inst:IsA("UIStroke") then
+				if inst.Enabled ~= false and inst.Transparency < 1 and self:IsGreenColor(inst.Color) then
 					foundGreen = true
 					break
 				end
-			end
-
-			-- BillboardGui TextLabel / ImageLabel children colored green
-			if inst:IsA("TextLabel") or inst:IsA("ImageLabel") or inst:IsA("Frame") then
-				if self:IsGreenColor(inst.BackgroundColor3) then
-					foundGreen = true
-					break
-				end
-				if inst:IsA("TextLabel") and self:IsGreenColor(inst.TextColor3) then
-					foundGreen = true
-					break
-				end
-				if inst:IsA("ImageLabel") and self:IsGreenColor(inst.ImageColor3) then
-					foundGreen = true
-					break
-				end
-			end
-
-			-- BasePart with a green color (game-specific colored outlines via material/part)
-			if inst:IsA("BasePart") then
-				if self:IsGreenColor(inst.Color) then
-					foundGreen = true
-					break
-				end
-			end
-		end
-
-		-- Also scan Workspace for Highlight/SelectionBox with Adornee pointing at this character
-		-- (some ESP systems parent these to Workspace/CoreGui instead of the character)
-		if not foundGreen then
-			for _, inst in ipairs(Workspace:GetDescendants()) do
-				if foundGreen then break end
-				local adornee = nil
-				pcall(function() adornee = inst.Adornee end)
-				if adornee and (adornee == character or (typeof(adornee) == "Instance" and adornee:IsDescendantOf(character))) then
-					if inst:IsA("Highlight") then
-						if self:IsGreenColor(inst.OutlineColor) or self:IsGreenColor(inst.FillColor) then
-							foundGreen = true
-						end
-					elseif inst:IsA("SelectionBox") then
-						if self:IsGreenColor(inst.Color3) or self:IsGreenColor(inst.SurfaceColor3) then
-							foundGreen = true
-						end
+			-- UI Labels and Frames
+			elseif inst:IsA("TextLabel") or inst:IsA("ImageLabel") or inst:IsA("Frame") then
+				if inst.Visible ~= false then
+					if self:IsGreenColor(inst.BackgroundColor3) then
+						foundGreen = true
+						break
 					end
+					if inst:IsA("TextLabel") and self:IsGreenColor(inst.TextColor3) then
+						foundGreen = true
+						break
+					end
+					if inst:IsA("ImageLabel") and self:IsGreenColor(inst.ImageColor3) then
+						foundGreen = true
+						break
+					end
+				end
+			-- BasePart color tint
+			elseif inst:IsA("BasePart") then
+				if inst.Transparency < 1 and self:IsGreenColor(inst.Color) then
+					foundGreen = true
+					break
 				end
 			end
 		end
@@ -552,12 +553,136 @@ function Utils:ScanGreenOutlinePlayers()
 		if foundGreen then
 			self.GreenTeamFilter[player] = true
 		else
-			-- Only clear if they weren't already in the filter from before
-			-- (keeps the filter sticky until player respawns fresh without green)
-			self.GreenTeamFilter[player] = nil
+			table.insert(unconfirmed, { player = player, character = character })
+		end
+	end
+
+	-- Tier 2: Single sweep across Workspace for external Highlights/SelectionBoxes
+	if #unconfirmed > 0 then
+		local charMap = {}
+		for _, entry in ipairs(unconfirmed) do
+			charMap[entry.character] = entry.player
+		end
+
+		for _, inst in ipairs(Workspace:GetChildren()) do
+			if inst:IsA("Highlight") or inst:IsA("SelectionBox") then
+				local adornee = nil
+				pcall(function() adornee = inst.Adornee end)
+				if adornee then
+					local matchedPlayer = charMap[adornee]
+					if not matchedPlayer and typeof(adornee) == "Instance" then
+						for char, plyr in pairs(charMap) do
+							if adornee:IsDescendantOf(char) then
+								matchedPlayer = plyr
+								break
+							end
+						end
+					end
+
+					if matchedPlayer then
+						local isGreen = false
+						if inst:IsA("Highlight") then
+							if (inst.Enabled ~= false) and (inst.OutlineTransparency < 1 or inst.FillTransparency < 1) then
+								isGreen = self:IsGreenColor(inst.OutlineColor) or self:IsGreenColor(inst.FillColor)
+							end
+						elseif inst:IsA("SelectionBox") then
+							if (inst.Visible ~= false) and (inst.Transparency < 1) then
+								isGreen = self:IsGreenColor(inst.Color3) or self:IsGreenColor(inst.SurfaceColor3)
+							end
+						end
+
+						if isGreen then
+							self.GreenTeamFilter[matchedPlayer] = true
+							charMap[matchedPlayer.Character] = nil
+						end
+					end
+				end
+			end
+		end
+
+		-- Any remaining unconfirmed alive players are cleared from the green filter
+		for _, plyr in pairs(charMap) do
+			self.GreenTeamFilter[plyr] = nil
 		end
 	end
 end
+--[[------------------------------------------------------------------------------
+    Player Ignore Filter
+--------------------------------------------------------------------------------]]
+
+-- Returns true if a player (or character/NPC) should be completely ignored by all systems.
+-- Accepts Player objects, character Model instances, dummy tables, or name strings.
+function Utils:IsIgnored(target)
+	if not target then
+		return false
+	end
+
+	-- Direct lookup (by object or string key)
+	if self.IgnoredPlayers[target] then
+		return true
+	end
+
+	local playerObj = nil
+	local name = nil
+
+	if typeof(target) == "Instance" then
+		if target:IsA("Player") then
+			playerObj = target
+			name = target.Name
+		elseif target:IsA("Model") then
+			playerObj = Players:GetPlayerFromCharacter(target)
+			name = target.Name
+		else
+			name = target.Name
+		end
+	elseif type(target) == "table" then
+		-- Support dummy player tables (such as those used in NPC ESP)
+		if target.Character and typeof(target.Character) == "Instance" then
+			playerObj = Players:GetPlayerFromCharacter(target.Character)
+		end
+		name = target.Name
+	elseif type(target) == "string" then
+		name = target
+	end
+
+	if playerObj and self.IgnoredPlayers[playerObj] then
+		return true
+	end
+	if name and self.IgnoredPlayers[name] then
+		return true
+	end
+
+	-- Also support config-based ignored list (e.g. config.aimbot.ignoredPlayers or config.ignoredPlayers)
+	local genv = self:GetGenEnv()
+	local config = genv.AimbotESP and genv.AimbotESP.Config
+	if config then
+		local cfgIgnored = (config.aimbot and config.aimbot.ignoredPlayers) or config.ignoredPlayers
+		if type(cfgIgnored) == "table" then
+			if playerObj and cfgIgnored[playerObj] then
+				return true
+			end
+			if name and (cfgIgnored[name] or table.find(cfgIgnored, name)) then
+				return true
+			end
+			if cfgIgnored[target] then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+-- Convenience: add a player to the ignore list (accepts object or name string)
+function Utils:IgnorePlayer(playerOrName)
+	self.IgnoredPlayers[playerOrName] = true
+end
+
+-- Convenience: remove a player from the ignore list (accepts object or name string)
+function Utils:UnignorePlayer(playerOrName)
+	self.IgnoredPlayers[playerOrName] = nil
+end
+
 --[[------------------------------------------------------------------------------
     Target Filtering & Prioritization
 --------------------------------------------------------------------------------]]
@@ -583,6 +708,10 @@ function Utils:GetValidTargets(options)
 	-- 1. Gather Players
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer and self:IsPlayerAlive(player) then
+			-- Always skip explicitly ignored players
+			if self:IsIgnored(player) then
+				continue
+			end
 			-- Always skip players detected as green-outlined teammates (dead players auto-purged by scan)
 			if self.GreenTeamFilter[player] then
 				continue
@@ -619,6 +748,10 @@ function Utils:GetValidTargets(options)
 		local activeNPCs = genv.AimbotESP and genv.AimbotESP.ActiveNPCs or {}
 		for _, npc in ipairs(activeNPCs) do
 			if npc and npc.Parent and self:IsTargetAlive(npc) then
+				-- Always skip explicitly ignored NPCs/characters
+				if self:IsIgnored(npc) then
+					continue
+				end
 				local root = self:GetTargetRootPart(npc)
 				if root then
 					local dist = (camPos - root.Position).Magnitude

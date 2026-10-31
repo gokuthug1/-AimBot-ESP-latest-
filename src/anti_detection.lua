@@ -112,13 +112,15 @@ function AntiDetection:IsActionAllowed(actionType)
 	end
 
 	actionType = actionType or "general"
-	local maxRate = config.maxActionsPerSecond or 30
+	local maxRate = (actionType == "aim") and 144 or (config.maxActionsPerSecond or 30)
 
-	-- Check global rate limit
-	local recentActions = self:GetRecentActions(1.0)
-	if #recentActions >= maxRate then
-		self:IncreaseSuspicion(4, "Rate limit exceeded (" .. #recentActions .. "/" .. maxRate .. ")")
-		return false
+	-- Check global rate limit (continuous per-frame render aim scales to display refresh rate)
+	if actionType ~= "aim" then
+		local recentActions = self:GetRecentActions(1.0)
+		if #recentActions >= maxRate then
+			self:IncreaseSuspicion(4, "Rate limit exceeded (" .. #recentActions .. "/" .. maxRate .. ")")
+			return false
+		end
 	end
 
 	-- Check action-specific limits
@@ -129,8 +131,8 @@ function AntiDetection:IsActionAllowed(actionType)
 		return false
 	end
 
-	-- Check for unnatural robotic regularities
-	if self:DetectSuspiciousPattern() then
+	-- Check for unnatural robotic regularities on discrete actions (not continuous per-frame camera lerp)
+	if actionType ~= "aim" and self:DetectSuspiciousPattern() then
 		self:IncreaseSuspicion(8, "Mechanical timing pattern detected")
 		return false
 	end
@@ -167,10 +169,10 @@ end
 -- Get action limit for specific action type
 function AntiDetection:GetActionLimit(actionType)
 	local limits = {
-		aim = 25,
-		shoot = 12,
-		movement = 35,
-		general = 30,
+		aim = 144,
+		shoot = 15,
+		movement = 120,
+		general = 144,
 	}
 	return limits[actionType] or limits.general
 end
@@ -267,9 +269,7 @@ function AntiDetection:HumanizeMovement(targetPosition, currentPosition, smoothn
 		return targetPosition
 	end
 
-	local humanSmoothness = math.max(1, self:GetHumanizedValue(smoothness or 10, 0.2))
-
-	-- Occasional micro-overshoot
+	-- Occasional micro-overshoot on target destination
 	local overshootChance = self.HumanPatterns.mouseMovement.overshoot.chance
 	if math.random() < overshootChance then
 		local overshootAmount = math.random(
@@ -280,17 +280,13 @@ function AntiDetection:HumanizeMovement(targetPosition, currentPosition, smoothn
 		targetPosition = targetPosition + (overshootDir * overshootAmount)
 	end
 
-	-- Micro-shakiness
+	-- Micro-shakiness applied to target destination
 	local shakiness = math.random()
 			* (self.HumanPatterns.aimingBehavior.shakiness.max - self.HumanPatterns.aimingBehavior.shakiness.min)
 		+ self.HumanPatterns.aimingBehavior.shakiness.min
 	local shakeOffset = Vector2.new((math.random() - 0.5) * shakiness, (math.random() - 0.5) * shakiness)
 
-	local t = 1 / humanSmoothness
-	local lerpX = currentPosition.X + (targetPosition.X - currentPosition.X) * t
-	local lerpY = currentPosition.Y + (targetPosition.Y - currentPosition.Y) * t
-
-	return Vector2.new(lerpX + shakeOffset.X, lerpY + shakeOffset.Y)
+	return targetPosition + shakeOffset
 end
 
 -- Get humanized value with variance

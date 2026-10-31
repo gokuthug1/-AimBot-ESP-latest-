@@ -2109,7 +2109,7 @@ function GUI:SetupHotkeys()
 
 		-- Target Part Cycle: F4 (Head -> Torso -> Smart -> RootPart)
 		if input.KeyCode == Enum.KeyCode.F4 and cfg then
-			local parts = { "Head", "Torso", "Smart", "RootPart" }
+			local parts = { "Head", "Torso", "Smart", "HumanoidRootPart" }
 			local current = cfg:Get("aimbot.targetPart") or "Head"
 			local idx = 1
 			for i, p in ipairs(parts) do

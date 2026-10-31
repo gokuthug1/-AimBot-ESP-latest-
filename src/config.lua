@@ -26,7 +26,7 @@ Config.Schemas = {
 		targetPart = "string",
 		fov = "number",
 		smoothness = "number",
-		prediction = "boolean",
+		prediction = "boolean",`r`n`t`tpredictionTime = "number",
 		teamCheck = "boolean",
 		visibilityCheck = "boolean",
 		maxDistance = "number",
@@ -36,6 +36,7 @@ Config.Schemas = {
 		aggressiveMode = "boolean",
 		aimMode = "string",
 		showFOV = "boolean",
+		ignoredPlayers = "table",
 	},
 	triggerBot = {
 		enabled = "boolean",
@@ -108,7 +109,7 @@ Config.Default = {
 		targetPart = "Head", -- "Head", "Torso", "Smart", "HumanoidRootPart"
 		fov = 120,
 		smoothness = 10,
-		prediction = true,
+		prediction = true,`r`n`t`tpredictionTime = 0.1,
 		teamCheck = true,
 		visibilityCheck = true,
 		maxDistance = 1000,
@@ -118,6 +119,7 @@ Config.Default = {
 		aggressiveMode = false,
 		aimMode = "Hybrid", -- "Hybrid", "Camera", "Mouse"
 		showFOV = true,
+		ignoredPlayers = {},
 	},
 	triggerBot = {
 		enabled = false,
@@ -196,7 +198,7 @@ Config.GameProfiles = {
 			fov = 85,
 			smoothness = 8,
 			targetPart = "Head",
-			prediction = true,
+			prediction = true,`r`n`t`tpredictionTime = 0.1,
 			aimMode = "Camera",
 			teamCheck = true,
 		},
@@ -212,7 +214,7 @@ Config.GameProfiles = {
 			fov = 75,
 			smoothness = 12,
 			targetPart = "Torso",
-			prediction = true,
+			prediction = true,`r`n`t`tpredictionTime = 0.1,
 			aimMode = "Camera",
 		},
 		esp = {
@@ -253,7 +255,7 @@ Config.GameProfiles = {
 			fov = 80,
 			smoothness = 9,
 			targetPart = "Head",
-			prediction = true,
+			prediction = true,`r`n`t`tpredictionTime = 0.1,
 			aimMode = "Camera",
 		},
 		esp = {
