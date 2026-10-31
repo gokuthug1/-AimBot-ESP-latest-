@@ -54,35 +54,51 @@ function Utils:GetGenEnv()
 end
 
 function Utils:GetSafeGuiParent()
-	local success, hui = pcall(function()
+	-- 1. Try gethui() (Standard executor hidden UI container)
+	local okHui, hui = pcall(function()
 		if type(gethui) == "function" then
-			return gethui()
+			local h = gethui()
+			if h then
+				return h
+			end
 		end
 		return nil
 	end)
-	if success and hui then
+	if okHui and hui then
 		return hui
 	end
 
-	local coreGuiSuccess, coreGui = pcall(function()
-		return game:GetService("CoreGui")
+	-- 2. Try CoreGui (Directly to CoreGui - NEVER to RobloxGui which has security restrictions!)
+	local okCore, coreGui = pcall(function()
+		local cg = game:GetService("CoreGui")
+		-- Probe to ensure we can actually parent here without identity error
+		local probe = Instance.new("Folder")
+		probe.Parent = cg
+		probe:Destroy()
+		return cg
 	end)
-	if coreGuiSuccess and coreGui then
-		local rbxGui = coreGui:FindFirstChild("RobloxGui")
-		if rbxGui then
-			return rbxGui
-		end
+	if okCore and coreGui then
 		return coreGui
 	end
 
-	if LocalPlayer then
-		local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-		if playerGui then
-			return playerGui
+	-- 3. LocalPlayer PlayerGui (Always writable at identity 2)
+	local lp = LocalPlayer or Players.LocalPlayer
+	if lp then
+		local pg = lp:FindFirstChildOfClass("PlayerGui")
+		if pg then
+			return pg
+		end
+		local okPg, foundPg = pcall(function()
+			return lp:WaitForChild("PlayerGui", 2)
+		end)
+		if okPg and foundPg then
+			return foundPg
 		end
 	end
 
-	return Workspace
+	-- 4. Safe fallback
+	local okCg, cg = pcall(function() return game:GetService("CoreGui") end)
+	return (okCg and cg) or Workspace
 end
 
 function Utils:HasDrawingAPI()

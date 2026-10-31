@@ -55,16 +55,17 @@ A sophisticated, modular AimBot, TriggerBot, and ESP (Extra Sensory Perception) 
 
 ## 🚀 Installation
 
-### Method 1: Script Executor (Recommended)
-1. Download a Roblox script executor (Synapse X, KRNL, Script-Ware, Wave, Delta, etc.)
-2. Copy the contents of `src/main.lua`
-3. Paste into your executor and execute
+### Method 1: All-In-One Standalone (Recommended - 100% Reliable & Offline)
+1. Copy the entire contents of [`bundle.lua`](bundle.lua)
+2. Paste directly into your executor (Synapse X, Wave, Delta, Solara, Codex, etc.) and click **Execute**
+*Requires zero external HTTP downloads or filesystem access — runs natively out of the box.*
 
-### Method 2: Auto-Execute
-1. Place `main.lua` in your executor's autoexec folder
-2. Restart Roblox for automatic loading
+### Method 2: Loadstring (Single-File Cloud Stream)
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP-latest-/main/bundle.lua"))()
+```
 
-### Method 3: Loadstring
+### Method 3: Modular Loadstring
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP-latest-/main/src/main.lua"))()
 ```

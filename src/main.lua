@@ -19,6 +19,15 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then
+	pcall(function()
+		LocalPlayer = Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+	end)
+	if not LocalPlayer then
+		LocalPlayer = Players.LocalPlayer
+	end
+end
+
 local Camera = Workspace.CurrentCamera
 
 Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
@@ -81,9 +90,11 @@ local function registerNPC(descendant)
 	end
 end
 
-for _, desc in ipairs(Workspace:GetDescendants()) do
-	registerNPC(desc)
-end
+task.spawn(function()
+	for _, desc in ipairs(Workspace:GetDescendants()) do
+		registerNPC(desc)
+	end
+end)
 
 local npcAddConn = Workspace.DescendantAdded:Connect(registerNPC)
 table.insert(genv.AimbotESP.Connections, npcAddConn)
@@ -107,46 +118,87 @@ table.insert(genv.AimbotESP.Connections, npcRemoveConn)
 
 local GITHUB_REPO = "https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP-latest-/main/src/"
 
+-- Universal HTTP Fetcher supporting all executors (game:HttpGet, request, http_request, syn.request, http.request)
+local function fetchHttp(url)
+	-- Method 1: game:HttpGet with cache-bypass flag
+	local ok1, res1 = pcall(function()
+		return game:HttpGet(url, true)
+	end)
+	if ok1 and type(res1) == "string" and #res1 > 50 and not string.find(res1, "404: Not Found") then
+		return res1
+	end
+
+	-- Method 2: standard game:HttpGet
+	local ok2, res2 = pcall(function()
+		return game:HttpGet(url)
+	end)
+	if ok2 and type(res2) == "string" and #res2 > 50 and not string.find(res2, "404: Not Found") then
+		return res2
+	end
+
+	-- Method 3: Executor request libraries
+	local reqFunc = (type(request) == "function" and request)
+		or (type(http_request) == "function" and http_request)
+		or (type(syn) == "table" and type(syn.request) == "function" and syn.request)
+		or (type(http) == "table" and type(http.request) == "function" and http.request)
+
+	if reqFunc then
+		local ok3, res3 = pcall(reqFunc, { Url = url, Method = "GET" })
+		if ok3 and type(res3) == "table" and type(res3.Body) == "string" and #res3.Body > 50 and not string.find(res3.Body, "404: Not Found") then
+			return res3.Body
+		end
+	end
+
+	return nil
+end
+
 local function loadModule(name, fileName)
 	-- 1. Try local filesystem
 	if type(readfile) == "function" and type(isfile) == "function" then
 		local candidates = { "src/" .. fileName, fileName, "scripts/" .. fileName }
 		for _, path in ipairs(candidates) do
-			if isfile(path) then
+			local exists = false
+			pcall(function() exists = isfile(path) end)
+			if exists then
 				local content = nil
 				pcall(function()
 					content = readfile(path)
 				end)
 				if content and #content > 50 then
-					local func = loadstring(content)
+					local func, parseErr = loadstring(content)
 					if func then
 						local ok, mod = pcall(func)
 						if ok and mod then
 							print("📦 Loaded module [" .. name .. "] from local file: " .. path)
 							return mod
+						else
+							warn("⚠️ Runtime error in local [" .. name .. "]: " .. tostring(mod))
 						end
+					else
+						warn("⚠️ Syntax error in local [" .. name .. "]: " .. tostring(parseErr))
 					end
 				end
 			end
 		end
 	end
 
-	-- 2. Try HTTP Get from GitHub raw
-	if game.HttpGet then
-		local url = GITHUB_REPO .. fileName
-		local ok, content = pcall(function()
-			return game:HttpGet(url)
-		end)
-		if ok and content and #content > 50 and not string.find(content, "404: Not Found") then
-			local func = loadstring(content)
-			if func then
-				local modOk, mod = pcall(func)
-				if modOk and mod then
-					print("🌐 Loaded module [" .. name .. "] from GitHub: " .. fileName)
-					return mod
-				end
+	-- 2. Try HTTP Get from GitHub raw with universal fetcher
+	local content = fetchHttp(GITHUB_REPO .. fileName)
+	if content then
+		local func, parseErr = loadstring(content)
+		if func then
+			local modOk, mod = pcall(func)
+			if modOk and mod then
+				print("🌐 Loaded module [" .. name .. "] from GitHub: " .. fileName)
+				return mod
+			else
+				warn("⚠️ Runtime error in module [" .. name .. "]: " .. tostring(mod))
 			end
+		else
+			warn("⚠️ Syntax error in module [" .. name .. "]: " .. tostring(parseErr))
 		end
+	else
+		warn("⚠️ Failed to fetch module [" .. name .. "] over HTTP")
 	end
 
 	return nil

@@ -207,11 +207,28 @@ end
 
 local function createInstance(className, props, parent)
 	local inst = Instance.new(className)
+	local parentToSet = parent
 	for k, v in pairs(props or {}) do
-		inst[k] = v
+		if k == "Parent" then
+			parentToSet = v
+		else
+			inst[k] = v
+		end
 	end
-	if parent then
-		inst.Parent = parent
+	if parentToSet then
+		local ok = pcall(function()
+			inst.Parent = parentToSet
+		end)
+		if not ok then
+			-- Fallback to PlayerGui if CoreGui/parent is locked by executor identity
+			pcall(function()
+				local lp = Players.LocalPlayer
+				local pg = lp and lp:FindFirstChildOfClass("PlayerGui")
+				if pg then
+					inst.Parent = pg
+				end
+			end)
+		end
 	end
 	return inst
 end
